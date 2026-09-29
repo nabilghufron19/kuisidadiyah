@@ -141,7 +141,7 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 @media(max-width:560px){.endless{flex-direction:column;align-items:stretch}}
 /* ===== Profil, toast, panduan, tahap Tathbiq ===== */
 .av{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;font-size:1.1rem;flex:none}.av.lg{width:84px;height:84px;font-size:2.6rem}
-#who{display:flex;align-items:center;gap:10px}#who span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#who{display:flex;align-items:center;gap:10px}#who>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .un{display:flex;align-items:center;gap:8px;min-width:0}
 .prof{display:flex;align-items:center;gap:18px}.prof h1{margin:0 0 6px}.prof .muted{margin:8px 0 0}
 .avs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}.avb{border-radius:50%;padding:3px;border:3px solid transparent;display:grid}.avb .av{width:100%;height:auto;aspect-ratio:1;font-size:1.5rem}.avb.on{border-color:var(--accent)}
@@ -153,6 +153,26 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px}
 .modal .box{background:var(--surface);border-radius:22px;max-width:560px;width:100%;max-height:86vh;overflow:auto;padding:22px;animation:pop .3s}
 .gl{padding-left:20px;margin:0 0 8px}.gl li{margin-bottom:6px}
+/* ===== Efek foto profil (naik seiring pencapaian) ===== */
+@keyframes spin{to{transform:rotate(1turn)}}
+@keyframes aura{0%,100%{box-shadow:0 0 calc(var(--t)*2) 0 var(--c1)}50%{box-shadow:0 0 calc(var(--t)*4.5) calc(var(--t)*.6) var(--c1)}}
+@keyframes bob{50%{transform:translateX(-50%) translateY(-3px) rotate(-10deg)}}
+.av.md{width:52px;height:52px;font-size:1.6rem}
+.avw{--sz:32px;--t:3px;position:relative;display:inline-grid;flex:none;border-radius:50%;isolation:isolate}
+.avw.md{--sz:52px;--t:4px}.avw.lg{--sz:84px;--t:5px}
+.avw::before{content:'';position:absolute;inset:calc(var(--t)*-1);border-radius:50%;z-index:-1;background:var(--c1)}
+.avw.t2::before,.avw.t3::before,.avw.t4::before{background:conic-gradient(var(--c1),var(--c2),var(--c1));animation:spin 4s linear infinite}
+.avw.t2,.avw.t3,.avw.t4{animation:aura 2.4s ease-in-out infinite}
+.avw.fx4::before{background:conic-gradient(#C5DA2B,#2BA3E6,#A94BC0,#F5A31A,#C5DA2B)}
+.avw.t3::before{animation-duration:2.6s}.avw.t3{animation-duration:2s}
+.avw.t3::after,.avw.t4::after{content:'';position:absolute;inset:calc(var(--t)*-1);border-radius:50%;z-index:2;pointer-events:none;background:radial-gradient(circle at 50% calc(var(--t)*.5),#fff 0 calc(var(--t)*.5),transparent calc(var(--t)*.65));filter:drop-shadow(0 0 2px #fff);animation:spin 2.4s linear infinite}
+.avw.t4::before{background:conic-gradient(#FFF3B0,#F2B705,#B8860B,#F2B705,#FFF3B0);animation-duration:2s}
+.avw.t4{animation-duration:1.6s}
+.avw.t4::after{background:radial-gradient(circle at 50% calc(var(--t)*.5),#fff 0 calc(var(--t)*.5),transparent calc(var(--t)*.65)),radial-gradient(circle at 50% calc(100% - var(--t)*.5),#fff 0 calc(var(--t)*.5),transparent calc(var(--t)*.65));animation-duration:3s}
+.crn{position:absolute;left:50%;top:calc(var(--sz)*-.4);transform:translateX(-50%) rotate(-10deg);font-style:normal;font-size:calc(var(--sz)*.46);line-height:1;z-index:3;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));animation:bob 2s ease-in-out infinite}
+.fxg{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.fxi{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:22px 8px 12px;border-radius:16px;border:1px solid var(--line);background:var(--bg);opacity:.5}
+.fxi.on{opacity:1}.fxi.cur{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}.fxi small{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -197,7 +217,7 @@ async function api(p, b) {
 }
 const closeMenu = () => $('#app').classList.remove('open');
 function go(v, a) {
-  closeMenu();
+  closeMenu(); if (me) renderChip();
   document.querySelectorAll('.nav[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   ({ auth: vAuth, home: vHome, board: vBoard, admin: vAdmin, profile: vProfile })[v](a);
   $('.scroll').scrollTop = 0;
@@ -381,11 +401,22 @@ function vEndResult(r) {
 
 /* ---------- Profil, notifikasi, panduan ---------- */
 const AVS = [['🦁', '#F5A31A'], ['🦅', '#2BA3E6'], ['🐪', '#D2A15B'], ['🐢', '#2EAD5C'], ['🦉', '#A94BC0'], ['🐬', '#3AA9F0'], ['🦊', '#EF7B3B'], ['🐼', '#9AA5B1'], ['🌙', '#4B4FB3'], ['📖', '#1A7A3C'], ['🕌', '#46C2B5'], ['⭐', '#F2B705']];
-const av = (k, sz = '') => { const a = AVS[(parseInt(String(k || 'a1').slice(1)) - 1) || 0]; return `<span class="av ${sz}" style="background:${a[1]}">${a[0]}</span>`; };
+/* Efek foto: level efek = jumlah pencapaian (0-11). Tier 1: cincin (1-3) · 2: cincin berputar + cahaya (4-6) · 3: + titik mengorbit (7-10) · 4: emas + mahkota (11, Takhossus) */
+const FXC = [['#2EAD5C', '#2EAD5C'], ['#2BA3E6', '#2BA3E6'], ['#A94BC0', '#A94BC0'], ['#F5A31A', '#C5DA2B'], ['#22A052', '#7CFFA8'], ['#2B8FE0', '#7CD3FF'], ['#A44FD0', '#E0A0FF'], ['#F08A1E', '#FFD27A'], ['#E24B3B', '#FF9A8A'], ['#E0367A', '#FF8FC0'], ['#F2B705', '#FFF3B0']];
+const fxTier = n => n < 4 ? 1 : n < 7 ? 2 : n < 11 ? 3 : 4;
+const av = (k, sz = '', fx = 0) => {
+  const a = AVS[(parseInt(String(k || 'a1').slice(1)) - 1) || 0], e = `<span class="av ${sz}" style="background:${a[1]}">${a[0]}</span>`;
+  if (!(fx > 0)) return e;
+  const n = Math.min(fx, 11), f = FXC[n - 1];
+  return `<span class="avw ${sz} t${fxTier(n)} fx${n}" style="--c1:${f[0]};--c2:${f[1]}">${e}${n === 11 ? '<i class="crn">👑</i>' : ''}</span>`;
+};
+const myFx = () => [1, 2, 3, 4].filter(JD).length + (me.tstage || 0);
+const FXN = n => n < 5 ? 'Khatam ' + n + ' jilid' : STG[n - 5][0];
+const fxGrid = k => { const m = myFx(); return Array.from({ length: 11 }, (_, i) => i + 1).map(n => `<div class="fxi${n <= m ? ' on' : ''}${n === m ? ' cur' : ''}">${av(k, 'md', n)}<b>${FXN(n)}</b><small>${n === m ? 'Sedang dipakai' : n < m ? 'Terbuka' : '🔒 Terkunci'}</small></div>`).join(''); };
 const STG = [['Tathbiq 1', '#1A7A3C', '📘'], ['Tathbiq 2', '#1573C4', '📗'], ['Tathbiq 3', '#7B2FA0', '📙'], ['Tathbiq 4', '#D9730D', '📕'], ['Tathbiq 5', '#C0392B', '📒'], ['Tathbiq 6', '#B3245B', '📚'], ['Takhossus', '#F2B705', '👑']];
 const stg = n => STG[Math.min(Math.ceil(n / 10), 7) - 1];
 const stgStyle = n => `background:${stg(n)[1]};color:${Math.ceil(n / 10) > 6 ? '#1a1a1a' : '#fff'}`;
-const renderChip = () => { $('#who').innerHTML = av(me.avatar) + '<span>' + esc(me.username) + '</span>'; };
+const renderChip = () => { $('#who').innerHTML = av(me.avatar, '', myFx()) + '<span>' + esc(me.username) + '</span>'; };
 function toast(msg, ico = '🔔') {
   const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<span>${ico}</span><div>${msg}</div>`;
   $('#toasts').appendChild(t); setTimeout(() => t.remove(), 5200);
@@ -402,7 +433,8 @@ const GUIDE = {
     <li>Total XP menentukan rank liga: ${RANKS.map(r => r[2] + ' ' + r[1] + ' ' + r[0]).join(' · ')} XP.</li>
     <li><b>Leaderboard</b> mengurutkan murid berdasarkan total XP. Bisa disaring per jilid, ada tab Tathbiq, dan ada kolom cari nama.</li>
     <li>Level bertanda ✅ berarti quest selesai. Selesaikan ketiga level sebuah jilid untuk meraih <b>pencapaian jilid</b> itu. Setelah keempat jilid selesai, <b>Mode Tathbiq</b> terbuka.</li>
-    <li>Di <b>Profil</b> kamu bisa mengganti username dan foto (pilihan yang tersedia) serta melihat pencapaian.</li></ul>`,
+    <li>Di <b>Profil</b> kamu bisa mengganti username dan foto (pilihan yang tersedia) serta melihat pencapaian.</li>
+    <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai.</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
@@ -422,13 +454,14 @@ async function vProfile() {
   try { Object.assign(me, await api('me')); } catch (e) { V.textContent = e.message; return; }
   const xp = Object.values(me.best).reduce((a, b) => a + b, 0), ri = RANKS.reduce((a, r, n) => xp >= r[0] ? n : a, 0);
   let cur = me.avatar || 'a1';
-  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg')}</div><div><h1>${esc(me.username)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span>
+  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg', myFx())}</div><div><h1>${esc(me.username)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span>
     <p class="muted">${xp} XP · Rekor Tathbiq ${me.best['0:endless'] || 0} XP</p></div></div>
     <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Pilih foto:</p>
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
     <div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
+    <div class="card"><h2>Efek foto profil</h2><p class="muted">Setiap pencapaian menambah efek pada fotomu. Makin banyak pencapaian, makin megah efeknya. Puncaknya, Takhossus, berhias mahkota emas.</p><div class="fxg" id="fxg">${fxGrid(cur)}</div></div>
     <div class="card"><h2>Pencapaian (${[1, 2, 3, 4].filter(JD).length + (me.tstage || 0)}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${JD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${JD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${JD(j) ? 'Semua quest selesai' : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < (me.tstage || 0) ? ' on' : ''}" style="--c:${s[1]}"><span>${i < (me.tstage || 0) ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>`;
-  V.querySelectorAll('.avb').forEach(b => b.onclick = () => { cur = b.dataset.a; V.querySelectorAll('.avb').forEach(x => x.classList.toggle('on', x === b)); $('#pav').innerHTML = av(cur, 'lg'); });
+  V.querySelectorAll('.avb').forEach(b => b.onclick = () => { cur = b.dataset.a; V.querySelectorAll('.avb').forEach(x => x.classList.toggle('on', x === b)); $('#pav').innerHTML = av(cur, 'lg', myFx()); $('#fxg').innerHTML = fxGrid(cur); });
   $('#ps').onclick = async () => {
     try { const r = await api('profile', { username: $('#pu').value.trim(), avatar: cur }); me.username = r.username; me.avatar = r.avatar; renderChip(); toast('Profil disimpan', '✅'); vProfile(); }
     catch (e) { $('#err').textContent = e.message; }
@@ -450,7 +483,7 @@ async function vBoard(j = 0) {
       if (my !== seq) return;
       const box = $('#lbr');
       box.classList.toggle('nofx', !first);
-      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.avatar)}<span>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
+      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.avatar, '', r.fx)}<span>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
         : `<p class="muted">${bq ? 'Tidak ada murid bernama "' + esc(bq) + '".' : 'Belum ada nilai.'}</p>`;
       first = false;
     } catch (e) { $('#lbr').textContent = e.message; }
