@@ -110,6 +110,11 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .lvl .pb{background:color-mix(in srgb,currentColor 25%,transparent)}.lvl .pb u{background:currentColor}
 .urow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.urow:last-child{border:0}
 .del{padding:8px 16px;color:#c0392b}.nofx .lrow{animation:none}
+/* ===== Kredit ===== */
+.credit{text-align:center;color:var(--muted);font-size:.8rem;letter-spacing:.02em;line-height:1.4}.credit b{color:var(--accent);font-weight:700}
+.scroll{display:flex;flex-direction:column}.wrap{width:100%;flex:1 0 auto}
+.scroll>.credit{padding:28px 0 0}.side .credit{text-align:left;padding:8px 14px 0}
+@media(min-width:821px){body:not(.anon) .scroll>.credit{display:none}}
 </style>
 </head>
 <body>
@@ -123,11 +128,12 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
     <div class="who" id="who"></div>
     <button class="nav" id="theme">Ganti tema</button>
     <button class="nav" id="out">Keluar</button>
+    <div class="credit">Powered by<br><b>Ust. Nabil Ghufron</b></div>
   </aside>
   <div class="scrim" id="scrim"></div>
   <main class="main">
     <header class="top"><button class="icon-btn" id="menu" aria-label="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button><b>Al-Miftah</b></header>
-    <div class="scroll"><div class="wrap" id="view"></div></div>
+    <div class="scroll"><div class="wrap" id="view"></div><div class="credit">Powered by <b>Ust. Nabil Ghufron</b></div></div>
   </main>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
