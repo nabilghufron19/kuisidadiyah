@@ -120,6 +120,19 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .brand{padding:0 4px 14px}.brand img{display:block;width:100%;max-width:210px}
 .top-logo{display:block;height:40px;width:auto}
 .auth-logo{display:block;width:min(300px,85%);margin:0 auto 12px}
+/* ===== Daftar rank ===== */
+.ranks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.rnk{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding:12px 4px;border-radius:16px;border:1px solid var(--line);background:var(--bg)}
+.rnk .dot{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:var(--soft);color:var(--muted);margin-bottom:4px}
+.rnk small{color:var(--muted);font-weight:600}
+.rnk.done .dot,.rnk.cur .dot{background:var(--accent);color:var(--on)}
+.rnk.cur{border-color:var(--accent);background:var(--soft);box-shadow:inset 0 0 0 1px var(--accent)}.rnk.cur .dot{animation:pop .5s}
+.rnk.lock{opacity:.6}
+@media(max-width:560px){.ranks{grid-template-columns:1fr}.rnk{flex-direction:row;text-align:left;gap:12px;padding:10px 14px}.rnk .dot{margin:0}.rnk small{margin-left:auto}}
+/* ===== Rank liga ===== */
+.rnk.done .dot,.rnk.cur .dot{background:var(--rc);color:#1a1a1a;font-size:1.25rem}
+.rnk.cur{border-color:var(--rc);background:var(--soft);box-shadow:inset 0 0 0 2px var(--rc)}
+.rnk.cur b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -222,20 +235,21 @@ function burst(x, y, n = 14) {
 /* ---------- Beranda ---------- */
 const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'] };
 const jst = j => `--c:${JC[j][0]};--d:${JC[j][1]};--fg:${JC[j][2]}`;
-const RANKS = [[0, "Mubtadi'"], [300, 'Mutawassith'], [900, 'Mutaqaddim'], [1800, 'Ahli Nahwu']];
+const RANKS = [[0, 'Bronze', '🥉', '#CD7F32'], [300, 'Silver', '🥈', '#B8C2CC'], [700, 'Gold', '🥇', '#F2B705'], [1200, 'Platinum', '🛡️', '#46C2B5'], [1800, 'Diamond', '💎', '#3AA9F0']];
 function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0);
   const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1];
   V.innerHTML = `<h1>Assalamu'alaikum, ${esc(me.username)}</h1>
-    <div class="card"><span class="tag">${RANKS[ri][1]}</span><h1><span id="tx">0</span> XP</h1><div class="prog"><i id="pg"></i></div>
+    <div class="card"><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span><h1><span id="tx">0</span> XP</h1><div class="prog"><i id="pg"></i></div>
     <p class="muted" style="margin:8px 0 0">${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</p></div>
+    <div class="card" style="--i:2"><h2>Tingkatan rank</h2><div class="ranks">${RANKS.map((r, n) => `<div class="rnk ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${n <= ri ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div></div>
     <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n + 1};${jst(j)}"><span class="tag">Jilid ${j}</span><div class="lvls">` +
       Object.entries(LV).map(([k, [nm, c, x, ic, cl]]) => {
         const b = me.best[j + ':' + k] || 0;
         return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${b >= x ? '<span class="done">✅</span>' : ''}</button>`;
       }).join('') + `</div></div>`).join('') + `</div>`;
   count($('#tx'), tot);
-  setTimeout(() => { $('#pg').style.width = (nx ? (tot - RANKS[ri][0]) / (nx[0] - RANKS[ri][0]) * 100 : 100) + '%'; }, 80);
+  setTimeout(() => { $('#pg').style.background = RANKS[ri][3]; $('#pg').style.width = (nx ? (tot - RANKS[ri][0]) / (nx[0] - RANKS[ri][0]) * 100 : 100) + '%'; }, 80);
   V.querySelectorAll('.lvl').forEach(b => b.onclick = async () => {
     try { vQuiz(await api(`quiz?jilid=${b.dataset.j}&level=${b.dataset.l}`), +b.dataset.j, b.dataset.l); }
     catch (e) { alert(e.message); }
