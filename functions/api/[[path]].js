@@ -107,15 +107,19 @@ export async function onRequest({ request, env, params }) {
 
     if (route === 'GET leaderboard') {
       const j = +url.searchParams.get('jilid') || 0;
+      const q = (url.searchParams.get('q') || '').trim().slice(0, 30);
       const rows = await sql`
         with best as (
           select user_id, jilid, level,
                  max(round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total))::int xp
-          from attempts where ${j}::int = 0 or jilid = ${j}::int group by 1, 2, 3)
-        select rank() over (order by sum(xp) desc)::int as rank, u.username,
-               sum(xp)::int as total, count(distinct jilid)::int as jilids
-        from best join users u on u.id = best.user_id
-        group by u.username order by total desc, u.username limit 100`;
+          from attempts where ${j}::int = 0 or jilid = ${j}::int group by 1, 2, 3),
+        ranked as (
+          select rank() over (order by sum(xp) desc)::int as rank, u.username,
+                 sum(xp)::int as total, count(distinct jilid)::int as jilids
+          from best join users u on u.id = best.user_id group by u.username)
+        select * from ranked
+        where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
+        order by rank, username limit 100`;
       return J({ rows });
     }
 
@@ -142,6 +146,32 @@ export async function onRequest({ request, env, params }) {
       if (body.replace) await sql.transaction([sql`delete from questions where jilid = any(${[...new Set(rows.map(r => r.jilid))]})`, ins]);
       else await ins;
       return J({ added: rows.length });
+    }
+
+    if (route === 'GET admin/users') {
+      const q = (url.searchParams.get('q') || '').trim().slice(0, 30);
+      const users = await sql`
+        select u.id, u.username, u.role,
+          (select count(*) from attempts a where a.user_id = u.id)::int as attempts,
+          coalesce((select sum(x) from (
+            select max(round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total)) x
+            from attempts a where a.user_id = u.id group by a.jilid, a.level) t), 0)::int as xp
+        from users u
+        where ${q}::text = '' or strpos(lower(u.username), lower(${q}::text)) > 0
+        order by u.username limit 50`;
+      const [{ n }] = await sql`select count(*)::int n from users where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0`;
+      return J({ users, total: n });
+    }
+
+    if (route === 'POST admin/delete-user') {
+      const id = +body.id;
+      if (!id) return bad('ID tidak valid');
+      if (id === u.id) return bad('Tidak bisa menghapus akunmu sendiri');
+      const [t] = await sql`select role from users where id = ${id}`;
+      if (!t) return bad('Pengguna tidak ditemukan', 404);
+      if (t.role === 'admin') return bad('Akun admin tidak bisa dihapus dari sini', 403);
+      await sql`delete from users where id = ${id}`;
+      return J({ ok: true });
     }
 
     return bad('Tidak ditemukan', 404);
