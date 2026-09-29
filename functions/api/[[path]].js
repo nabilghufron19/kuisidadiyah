@@ -161,12 +161,23 @@ export async function onRequest({ request, env, params }) {
                  max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
           from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
-          select rank() over (order by sum(xp) desc)::int as rank, u.username, u.avatar,
+          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar,
                  sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
-          from best join users u on u.id = best.user_id group by u.username, u.avatar)
+          from best join users u on u.id = best.user_id group by u.id, u.username, u.avatar)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
         order by rank, username limit 100`;
+      // level efek foto = jumlah jilid khatam + tahap Tathbiq (sama seperti di /me)
+      const ids = rows.map(r => r.id), by = {}, st = {};
+      if (ids.length) {
+        const [bs, ts] = await Promise.all([
+          sql`select user_id, jilid, level, max(round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total))::int xp
+            from attempts where user_id = any(${ids}::int[]) and jilid between 1 and 4 group by 1, 2, 3`,
+          sql`select user_id, least(ceil(coalesce(max(n), 0) / 10.0), 7)::int s from endless_runs where user_id = any(${ids}::int[]) group by user_id`]);
+        for (const r of bs) (by[r.user_id] ||= []).push(r);
+        for (const r of ts) st[r.user_id] = r.s;
+      }
+      for (const r of rows) { r.fx = jilidDone(by[r.id] || []).filter(Boolean).length + (st[r.id] || 0); delete r.id; }
       return J({ rows });
     }
 
