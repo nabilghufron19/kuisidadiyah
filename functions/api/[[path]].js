@@ -5,7 +5,7 @@ const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, 
 const unb64 = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
 const bad = (m, s = 400) => J({ error: m }, s);
-const PASS_PCT = 100, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT = persen benar agar sebuah quest dianggap selesai
+const PASS_PCT = 60, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT = persen benar agar sebuah quest dianggap selesai
 const hmacKey = s => crypto.subtle.importKey('raw', enc.encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 
 async function sign(obj, secret) {
@@ -49,6 +49,7 @@ export async function onRequest({ request, env, params }) {
       const un = String(body.username || ''), pw = String(body.password || '');
       if (!/^[A-Za-z0-9_]{3,20}$/.test(un)) return bad('Username 3–20 karakter: huruf, angka, atau _');
       if (pw.length < 6) return bad('Password minimal 6 karakter');
+      if ((await sql`select 1 from users where lower(username) = lower(${un}) limit 1`).length) return bad('Username sudah dipakai', 409);
       const salt = crypto.getRandomValues(new Uint8Array(16));
       try {
         const [u] = await sql`insert into users (username, pass_hash, salt) values (${un}, ${await hash(pw, salt)}, ${b64(salt)}) returning id`;
@@ -72,7 +73,7 @@ export async function onRequest({ request, env, params }) {
     if (route === 'GET me') {
       const best = await bestOf(u.id), ach = jilidDone(best);
       const [t] = await sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${u.id}`;
-      return J({ username: u.username, role: u.role, avatar: u.avatar, tstage: t.s, pass: PASS_PCT, ach, tathbiq: ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ username: u.username, role: u.role, avatar: u.avatar, tstage: t.s, pass: PASS_PCT, ach, tathbiq: u.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -114,7 +115,7 @@ export async function onRequest({ request, env, params }) {
     }
 
     if (route === 'POST endless/start') {
-      if (!jilidDone(await bestOf(u.id)).every(Boolean)) return bad('Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai', 403);
+      if (u.role !== 'admin' && !jilidDone(await bestOf(u.id)).every(Boolean)) return bad('Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai', 403);
       const [q] = await sql`select id, q, a, b, c, d from questions order by random() limit 1`;
       if (!q) return bad('Belum ada soal');
       const [r] = await sql`insert into endless_runs (user_id, asked, n, cur) values (${u.id}, ${[q.id]}::int[], 1, ${q.id}) returning id`;
@@ -147,6 +148,7 @@ export async function onRequest({ request, env, params }) {
       const un = String(body.username ?? u.username).trim(), av = String(body.avatar ?? u.avatar);
       if (!/^[A-Za-z0-9_]{3,20}$/.test(un)) return bad('Username 3–20 karakter: huruf, angka, atau _');
       if (!/^a([1-9]|1[0-2])$/.test(av)) return bad('Foto tidak valid');
+      if ((await sql`select 1 from users where lower(username) = lower(${un}) and id <> ${u.id} limit 1`).length) return bad('Username sudah dipakai', 409);
       try { await sql`update users set username = ${un}, avatar = ${av} where id = ${u.id}`; }
       catch (e) { if (e.code === '23505') return bad('Username sudah dipakai', 409); throw e; }
       return J({ username: un, avatar: av });
@@ -161,9 +163,9 @@ export async function onRequest({ request, env, params }) {
                  max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
           from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
-          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar,
+          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role,
                  sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
-          from best join users u on u.id = best.user_id group by u.id, u.username, u.avatar)
+          from best join users u on u.id = best.user_id group by u.id, u.username, u.avatar, u.role)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
         order by rank, username limit 100`;
@@ -177,7 +179,7 @@ export async function onRequest({ request, env, params }) {
         for (const r of bs) (by[r.user_id] ||= []).push(r);
         for (const r of ts) st[r.user_id] = r.s;
       }
-      for (const r of rows) { r.fx = jilidDone(by[r.id] || []).filter(Boolean).length + (st[r.id] || 0); delete r.id; }
+      for (const r of rows) { r.fx = r.role === 'admin' ? 11 : jilidDone(by[r.id] || []).filter(Boolean).length + (st[r.id] || 0); delete r.id; delete r.role; }
       return J({ rows });
     }
 
@@ -204,6 +206,34 @@ export async function onRequest({ request, env, params }) {
       if (body.replace) await sql.transaction([sql`delete from questions where jilid = any(${[...new Set(rows.map(r => r.jilid))]})`, ins]);
       else await ins;
       return J({ added: rows.length });
+    }
+
+    if (route === 'GET admin/questions') {
+      const j = +url.searchParams.get('jilid') || 0, q = (url.searchParams.get('q') || '').trim().slice(0, 60);
+      const off = Math.max(0, +url.searchParams.get('offset') || 0), like = '%' + q.replace(/[\\%_]/g, '\\$&') + '%';
+      const rows = await sql`select id, jilid, q, a, b, c, d, answer from questions
+        where (${j}::int = 0 or jilid = ${j}::int) and (${q}::text = '' or q ilike ${like})
+        order by jilid, id limit 30 offset ${off}`;
+      const [{ n }] = await sql`select count(*)::int n from questions where (${j}::int = 0 or jilid = ${j}::int) and (${q}::text = '' or q ilike ${like})`;
+      return J({ rows, total: n });
+    }
+
+    if (route === 'POST admin/question-save') {
+      const id = +body.id || 0, j = +body.jilid, f = ['q', 'a', 'b', 'c', 'd'].map(k => String(body[k] ?? '').trim()), ans = String(body.answer || '').toUpperCase();
+      if (![1, 2, 3, 4].includes(j) || f.some(x => !x) || !/^[ABCD]$/.test(ans)) return bad('Jilid 1–4, semua kolom terisi, jawaban A–D');
+      if (id) {
+        const r = await sql`update questions set jilid = ${j}, q = ${f[0]}, a = ${f[1]}, b = ${f[2]}, c = ${f[3]}, d = ${f[4]}, answer = ${ans} where id = ${id} returning id`;
+        if (!r.length) return bad('Soal tidak ditemukan', 404);
+      } else await sql`insert into questions (jilid, q, a, b, c, d, answer) values (${j}, ${f[0]}, ${f[1]}, ${f[2]}, ${f[3]}, ${f[4]}, ${ans})`;
+      return J({ ok: true });
+    }
+
+    if (route === 'POST admin/question-delete') {
+      const ids = [].concat(body.ids ?? body.id ?? []).map(Number).filter(n => Number.isInteger(n) && n > 0).slice(0, 500);
+      if (!ids.length) return bad('Tidak ada soal dipilih');
+      try { await sql`delete from questions where id = any(${ids}::int[])`; }
+      catch (e) { if (e.code === '23503') return bad('Soal masih terhubung ke data lain', 409); throw e; }
+      return J({ deleted: ids.length });
     }
 
     if (route === 'GET admin/users') {
