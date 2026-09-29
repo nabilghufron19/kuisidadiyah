@@ -32,3 +32,11 @@ create index on attempts (user_id, jilid);
 
 -- Jadikan akun admin (daftar dulu lewat web, lalu jalankan):
 -- update users set role = 'admin' where lower(username) = lower('NAMA_ADMIN');
+
+-- Tambahan v2 (jalankan jika database sudah dibuat sebelumnya):
+create table if not exists quiz_answers (
+  nonce text not null,
+  qid int not null,
+  ok boolean not null,
+  primary key (nonce, qid)
+);

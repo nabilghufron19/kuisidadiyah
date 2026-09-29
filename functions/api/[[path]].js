@@ -62,8 +62,9 @@ export async function onRequest({ request, env, params }) {
     if (!u) return bad('Silakan masuk dulu', 401);
 
     if (route === 'GET me') {
-      const best = await sql`select jilid, max(correct)::int c from attempts where user_id = ${u.id} group by jilid`;
-      return J({ username: u.username, role: u.role, best: Object.fromEntries(best.map(r => [r.jilid, r.c])) });
+      const best = await sql`select jilid, level, max(round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total))::int xp
+        from attempts where user_id = ${u.id} group by jilid, level`;
+      return J({ username: u.username, role: u.role, best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -76,31 +77,43 @@ export async function onRequest({ request, env, params }) {
       return J({ questions: qs, token });
     }
 
+    if (route === 'POST check') {
+      const t = await verify(String(body.token || ''), S);
+      if (!t || t.k !== 'quiz' || t.uid !== u.id) return bad('Sesi kuis tidak valid atau kedaluwarsa');
+      const id = +body.id, c = String(body.choice || '');
+      if (!t.ids.includes(id) || !/^[ABCD]$/.test(c)) return bad('Jawaban tidak valid');
+      const [r] = await sql`select answer from questions where id = ${id}`;
+      if (!r) return bad('Soal tidak ditemukan');
+      const ok = r.answer === c;
+      const ins = await sql`insert into quiz_answers (nonce, qid, ok) values (${t.nonce}, ${id}, ${ok}) on conflict do nothing returning qid`;
+      if (!ins.length) return bad('Soal ini sudah dijawab', 409);
+      return J({ ok, answer: r.answer });
+    }
+
     if (route === 'POST submit') {
       const t = await verify(String(body.token || ''), S);
       if (!t || t.k !== 'quiz' || t.uid !== u.id) return bad('Sesi kuis tidak valid atau kedaluwarsa');
-      const key = await sql`select id, answer from questions where id = any(${t.ids})`;
-      if (!key.length) return bad('Soal tidak ditemukan');
-      const ans = body.answers || {};
-      const correct = key.filter(r => ans[r.id] === r.answer).length, total = key.length;
-      const score = Math.round(correct * 100 / total);
+      const total = t.ids.length, XP = { easy: 100, medium: 200, hard: 300 };
+      const [{ n }] = await sql`select count(*)::int n from quiz_answers where nonce = ${t.nonce} and ok`;
+      const score = Math.round(n * 100 / total), xp = Math.round(XP[t.l] * n / total);
       try {
-        await sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce) values (${u.id}, ${t.j}, ${t.l}, ${total}, ${correct}, ${score}, ${t.nonce})`;
+        await sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce) values (${u.id}, ${t.j}, ${t.l}, ${total}, ${n}, ${score}, ${t.nonce})`;
       } catch (e) {
-        if (e.code === '23505') return bad('Jawaban kuis ini sudah pernah dikirim', 409);
+        if (e.code === '23505') return bad('Kuis ini sudah pernah dikirim', 409);
         throw e;
       }
-      return J({ correct, total, score, key });
+      return J({ correct: n, total, score, xp });
     }
 
     if (route === 'GET leaderboard') {
       const j = +url.searchParams.get('jilid') || 0;
       const rows = await sql`
         with best as (
-          select user_id, jilid, max(correct) c from attempts
-          where ${j}::int = 0 or jilid = ${j}::int group by 1, 2)
-        select rank() over (order by sum(c) desc)::int as rank, u.username,
-               sum(c)::int as total, count(*)::int as jilids
+          select user_id, jilid, level,
+                 max(round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total))::int xp
+          from attempts where ${j}::int = 0 or jilid = ${j}::int group by 1, 2, 3)
+        select rank() over (order by sum(xp) desc)::int as rank, u.username,
+               sum(xp)::int as total, count(distinct jilid)::int as jilids
         from best join users u on u.id = best.user_id
         group by u.username order by total desc, u.username limit 100`;
       return J({ rows });
