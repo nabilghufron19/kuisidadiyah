@@ -98,6 +98,16 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .lvl:hover{transform:scale(1.03)}
 .btn:active:not(:disabled),.opt:active:not(:disabled),.lvl:active,.nav:active,.tabs button:active{transform:scale(.97)}
 .auth,.auth *{animation:none!important}
+/* ===== Warna per jilid (mengikuti sampul buku) ===== */
+.jc{border-top:5px solid var(--c)}
+.jc .tag{background:var(--c);color:var(--fg,#fff)}
+.jc .bar i{background:var(--c)}
+.lvl{color:var(--fg,#fff)}
+.lvl.e{background:linear-gradient(135deg,color-mix(in srgb,var(--c) 65%,#fff),var(--c))}
+.lvl.m{background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 78%,var(--d)))}
+.lvl.h{color:#fff;background:linear-gradient(135deg,var(--d),color-mix(in srgb,var(--d) 60%,#000))}
+.lvl .xp{white-space:nowrap;padding:1px 8px;font-size:.74rem;background:color-mix(in srgb,currentColor 18%,transparent)}
+.lvl .pb{background:color-mix(in srgb,currentColor 25%,transparent)}.lvl .pb u{background:currentColor}
 </style>
 </head>
 <body>
@@ -196,6 +206,8 @@ function burst(x, y, n = 14) {
 }
 
 /* ---------- Beranda ---------- */
+const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'] };
+const jst = j => `--c:${JC[j][0]};--d:${JC[j][1]};--fg:${JC[j][2]}`;
 const RANKS = [[0, "Mubtadi'"], [300, 'Mutawassith'], [900, 'Mutaqaddim'], [1800, 'Ahli Nahwu']];
 function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0);
@@ -203,7 +215,7 @@ function vHome() {
   V.innerHTML = `<h1>Assalamu'alaikum, ${esc(me.username)}</h1>
     <div class="card"><span class="tag">${RANKS[ri][1]}</span><h1><span id="tx">0</span> XP</h1><div class="prog"><i id="pg"></i></div>
     <p class="muted" style="margin:8px 0 0">${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</p></div>
-    <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card" style="--i:${n + 1}"><span class="tag">Jilid ${j}</span><div class="lvls">` +
+    <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n + 1};${jst(j)}"><span class="tag">Jilid ${j}</span><div class="lvls">` +
       Object.entries(LV).map(([k, [nm, c, x, ic, cl]]) => {
         const b = me.best[j + ':' + k] || 0;
         return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${b >= x ? '<span class="done">✅</span>' : ''}</button>`;
@@ -221,7 +233,7 @@ function vQuiz(d, j, l) {
   const qs = d.questions, wrong = []; let i = 0, streak = 0;
   const draw = () => {
     const q = qs[i];
-    V.innerHTML = `<div class="card"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
+    V.innerHTML = `<div class="card jc" style="${jst(j)}"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
       <div class="meta"><span class="muted">Jilid ${j} · ${LV[l][0]} · Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
       <h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
@@ -255,7 +267,7 @@ function vResult(r, j, l, wrong) {
   const k = j + ':' + l, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev);
   me.best[k] = Math.max(prev, r.xp);
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
-  V.innerHTML = `<div class="card res"><div class="big">${em}</div><span class="tag">Hasil · Jilid ${j} · ${LV[l][0]}</span>
+  V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${em}</div><span class="tag">Hasil · Jilid ${j} · ${LV[l][0]}</span>
     <h1><span id="rx">0</span> / ${LV[l][2]} XP</h1><p class="muted">${r.correct} dari ${r.total} soal benar · nilai ${r.score}</p>
     <span class="chip pop">${gain ? '+' + gain + ' XP masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
@@ -285,7 +297,7 @@ async function vAdmin() {
   try { st = await api('admin/stats'); } catch (e) { V.textContent = e.message; return; }
   let rows = [];
   V.innerHTML = `<h1>Panel Admin</h1><div class="grid">` +
-    [1, 2, 3, 4].map(j => `<div class="card"><span class="tag">Jilid ${j}</span><h2>${st.q[j] || 0} soal</h2></div>`).join('') +
+    [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2>${st.q[j] || 0} soal</h2></div>`).join('') +
     `</div><div class="card"><p class="muted">Kolom Excel: <code>jilid, pertanyaan, A, B, C, D, jawaban</code> (jawaban = huruf A–D). ${st.users} murid · ${st.attempts} percobaan.</p>
     <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="tp">Unduh template Excel</button></div>
     <input type="file" id="fl" accept=".xlsx,.xls,.csv">
