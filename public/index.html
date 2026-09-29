@@ -257,6 +257,9 @@ function burst(x, y, n = 14) {
 /* ---------- Beranda ---------- */
 const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'] };
 const jst = j => `--c:${JC[j][0]};--d:${JC[j][1]};--fg:${JC[j][2]}`;
+/* Quest selesai = level bertanda ✅ (aturan persennya ada di server: PASS_PCT). Jilid selesai = 3 level selesai. Tathbiq terbuka = 4 jilid selesai. */
+const qd = (j, k) => (me.best[j + ':' + k] || 0) >= LV[k][2] * (me.pass || 100) / 100;
+const JN = j => Object.keys(LV).filter(k => qd(j, k)).length, JD = j => JN(j) === 3, TAT = () => [1, 2, 3, 4].every(JD);
 const RANKS = [[0, 'Bronze', '🥉', '#CD7F32'], [300, 'Silver', '🥈', '#B8C2CC'], [700, 'Gold', '🥇', '#F2B705'], [1200, 'Platinum', '🛡️', '#46C2B5'], [1800, 'Diamond', '💎', '#3AA9F0']];
 function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0);
@@ -265,11 +268,11 @@ function vHome() {
     <div class="card"><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span><h1><span id="tx">0</span> XP</h1><div class="prog"><i id="pg"></i></div>
     <p class="muted" style="margin:8px 0 0">${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</p></div>
     <div class="card" style="--i:2"><h2>Tingkatan rank</h2><div class="ranks">${RANKS.map((r, n) => `<div class="rnk ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${n <= ri ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div></div>
-    <div class="card endless" style="--i:3"><div><span class="tag">📚 Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2><p>3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!</p><small>Rekor: ${me.best['0:endless'] || 0} XP · Tahap tertinggi: ${me.tstage ? STG[me.tstage - 1][0] : '-'}</small></div><button class="btn" id="endStart">Mulai</button></div>
-    <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n + 1};${jst(j)}"><span class="tag">Jilid ${j}</span><div class="lvls">` +
+    <div class="card endless" style="--i:3"><div><span class="tag">${TAT() ? '📚' : '🔒'} Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2>${TAT() ? `<p>3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!</p><small>Rekor: ${me.best['0:endless'] || 0} XP · Tahap tertinggi: ${me.tstage ? STG[me.tstage - 1][0] : '-'}</small>` : `<p>Terkunci. Selesaikan semua quest Jilid 1–4 (level bertanda ✅) untuk membuka mode ini.</p><small>Jilid selesai: ${[1, 2, 3, 4].filter(JD).length}/4</small>`}</div><button class="btn" id="endStart"${TAT() ? '' : ' disabled'}>${TAT() ? 'Mulai' : '🔒 Terkunci'}</button></div>
+    <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n + 1};${jst(j)}"><span class="tag">Jilid ${j}${JD(j) ? ' 🏅' : ' · ' + JN(j) + '/3'}</span><div class="lvls">` +
       Object.entries(LV).map(([k, [nm, c, x, ic, cl]]) => {
         const b = me.best[j + ':' + k] || 0;
-        return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${b >= x ? '<span class="done">✅</span>' : ''}</button>`;
+        return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${qd(j, k) ? '<span class="done">✅</span>' : ''}</button>`;
       }).join('') + `</div></div>`).join('') + `</div>`;
   count($('#tx'), tot);
   $('#endStart').onclick = async () => { try { vEndless(await api('endless/start', {})); } catch (e) { alert(e.message); } };
@@ -317,7 +320,10 @@ function vQuiz(d, j, l) {
 }
 function vResult(r, j, l, wrong) {
   const k = j + ':' + l, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev);
+  const wasJ = JD(j), wasT = TAT();
   me.best[k] = Math.max(prev, r.xp);
+  if (!wasJ && JD(j)) toast(`Pencapaian baru: <b>Jilid ${j}</b> selesai!`, '🏅');
+  if (!wasT && TAT()) setTimeout(() => toast('<b>Mode Tathbiq terbuka!</b> Semua quest Jilid 1–4 sudah selesai.', '🔓'), 900);
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
   V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${em}</div><span class="tag">Hasil · Jilid ${j} · ${LV[l][0]}</span>
     <h1><span id="rx">0</span> / ${LV[l][2]} XP</h1><p class="muted">${r.correct} dari ${r.total} soal benar · nilai ${r.score}</p>
@@ -395,8 +401,10 @@ const GUIDE = {
     <li>Jawaban langsung dicek dan tidak bisa diubah setelah dipilih.</li>
     <li>Total XP menentukan rank liga: ${RANKS.map(r => r[2] + ' ' + r[1] + ' ' + r[0]).join(' · ')} XP.</li>
     <li><b>Leaderboard</b> mengurutkan murid berdasarkan total XP. Bisa disaring per jilid, ada tab Tathbiq, dan ada kolom cari nama.</li>
+    <li>Level bertanda ✅ berarti quest selesai. Selesaikan ketiga level sebuah jilid untuk meraih <b>pencapaian jilid</b> itu. Setelah keempat jilid selesai, <b>Mode Tathbiq</b> terbuka.</li>
     <li>Di <b>Profil</b> kamu bisa mengganti username dan foto (pilihan yang tersedia) serta melihat pencapaian.</li></ul>`,
-  tat: `<ul class="gl"><li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
+  tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai.</li>
+    <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
     <li>Poin tiap jawaban benar = 10 × nomor tahap: Tathbiq 1 = +10, Tathbiq 2 = +20, … Takhossus mulai +70 dan terus naik tiap 10 soal.</li>
     <li>XP Tathbiq <b>tanpa batas</b>. Rekor terbaikmu masuk ke total XP, dan ada tab khusus Tathbiq di leaderboard.</li>
@@ -419,7 +427,7 @@ async function vProfile() {
     <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Pilih foto:</p>
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
     <div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
-    <div class="card"><h2>Pencapaian (${me.tstage || 0}/7)</h2><div class="ach">${STG.map((s, i) => `<div class="ac${i < (me.tstage || 0) ? ' on' : ''}" style="--c:${s[1]}"><span>${i < (me.tstage || 0) ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>`;
+    <div class="card"><h2>Pencapaian (${[1, 2, 3, 4].filter(JD).length + (me.tstage || 0)}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${JD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${JD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${JD(j) ? 'Semua quest selesai' : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < (me.tstage || 0) ? ' on' : ''}" style="--c:${s[1]}"><span>${i < (me.tstage || 0) ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>`;
   V.querySelectorAll('.avb').forEach(b => b.onclick = () => { cur = b.dataset.a; V.querySelectorAll('.avb').forEach(x => x.classList.toggle('on', x === b)); $('#pav').innerHTML = av(cur, 'lg'); });
   $('#ps').onclick = async () => {
     try { const r = await api('profile', { username: $('#pu').value.trim(), avatar: cur }); me.username = r.username; me.avatar = r.avatar; renderChip(); toast('Profil disimpan', '✅'); vProfile(); }
