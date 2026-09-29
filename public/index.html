@@ -90,6 +90,14 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .res{text-align:center}.res .row{justify-content:center}.big{font-size:3.6rem;line-height:1.2;animation:pop .6s}
 .rk.r1,.rk.r2,.rk.r3{background:none;font-size:1.5rem}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* ===== Perbaikan: hover tidak menggeser elemen (mencegah goyang di tepi tombol) ===== */
+.btn:hover:not(:disabled),.tabs button:hover,.opt:hover:not(:disabled){transform:none}
+.btn:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 8px 20px -10px rgba(20,100,50,.6)}
+.tabs button:hover{border-color:var(--accent)}
+.opt:hover:not(:disabled){box-shadow:inset 4px 0 0 var(--accent)}
+.lvl:hover{transform:scale(1.03)}
+.btn:active:not(:disabled),.opt:active:not(:disabled),.lvl:active,.nav:active,.tabs button:active{transform:scale(.97)}
+.auth,.auth *{animation:none!important}
 </style>
 </head>
 <body>
