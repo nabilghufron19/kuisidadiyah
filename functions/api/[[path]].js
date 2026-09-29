@@ -31,7 +31,7 @@ export async function onRequest({ request, env, params }) {
   const auth = async () => {
     const p = await verify((request.headers.get('Authorization') || '').slice(7), S);
     if (!p || p.k !== 'auth') return null;
-    return (await sql`select id, username, role from users where id = ${p.uid}`)[0] || null;
+    return (await sql`select id, username, role, avatar from users where id = ${p.uid}`)[0] || null;
   };
   const authToken = id => sign({ k: 'auth', uid: id, exp: Date.now() + 6048e5 }, S);
 
@@ -62,9 +62,10 @@ export async function onRequest({ request, env, params }) {
     if (!u) return bad('Silakan masuk dulu', 401);
 
     if (route === 'GET me') {
-      const best = await sql`select jilid, level, max(round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total))::int xp
+      const best = await sql`select jilid, level, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
         from attempts where user_id = ${u.id} group by jilid, level`;
-      return J({ username: u.username, role: u.role, best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      const [t] = await sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${u.id}`;
+      return J({ username: u.username, role: u.role, avatar: u.avatar, tstage: t.s, best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -105,18 +106,56 @@ export async function onRequest({ request, env, params }) {
       return J({ correct: n, total, score, xp });
     }
 
+    if (route === 'POST endless/start') {
+      const [q] = await sql`select id, q, a, b, c, d from questions order by random() limit 1`;
+      if (!q) return bad('Belum ada soal');
+      const [r] = await sql`insert into endless_runs (user_id, asked, n, cur) values (${u.id}, ${[q.id]}::int[], 1, ${q.id}) returning id`;
+      return J({ run: r.id, question: q, n: 1, lives: 3, score: 0 });
+    }
+
+    if (route === 'POST endless/answer') {
+      const c = String(body.choice || '');
+      if (!/^[ABCD]$/.test(c)) return bad('Jawaban tidak valid');
+      const [r] = await sql`select * from endless_runs where id = ${+body.run || 0} and user_id = ${u.id}`;
+      if (!r || r.done) return bad('Sesi endless sudah berakhir', 409);
+      const [q] = await sql`select answer from questions where id = ${r.cur}`;
+      if (!q) return bad('Soal tidak ditemukan', 404);
+      const ok = q.answer === c, pts = ok ? 10 * Math.ceil(r.n / 10) : 0;
+      const lives = r.lives - (ok ? 0 : 1), score = r.score + pts, correct = r.correct + (ok ? 1 : 0);
+      let next = null;
+      if (lives > 0) [next] = await sql`select id, q, a, b, c, d from questions where id <> all(${r.asked}::int[]) order by random() limit 1`;
+      const over = !next, n = next ? r.n + 1 : r.n;
+      const upd = await sql`update endless_runs set lives = ${lives}, score = ${score}, correct = ${correct}, n = ${n},
+        asked = ${next ? [...r.asked, next.id] : r.asked}::int[], cur = ${next ? next.id : null}, done = ${over}
+        where id = ${r.id} and cur = ${r.cur} and not done returning id`;
+      if (!upd.length) return bad('Jawaban ini sudah dikirim', 409);
+      await sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
+        values (${u.id}, 0, 'endless', ${r.n}, ${correct}, ${score}, ${'endless-' + r.id})
+        on conflict (nonce) do update set total = excluded.total, correct = excluded.correct, score = excluded.score`;
+      return J({ ok, answer: q.answer, pts, lives, score, correct, next, over, cleared: over && lives > 0 });
+    }
+
+    if (route === 'POST profile') {
+      const un = String(body.username ?? u.username).trim(), av = String(body.avatar ?? u.avatar);
+      if (!/^[A-Za-z0-9_]{3,20}$/.test(un)) return bad('Username 3–20 karakter: huruf, angka, atau _');
+      if (!/^a([1-9]|1[0-2])$/.test(av)) return bad('Foto tidak valid');
+      try { await sql`update users set username = ${un}, avatar = ${av} where id = ${u.id}`; }
+      catch (e) { if (e.code === '23505') return bad('Username sudah dipakai', 409); throw e; }
+      return J({ username: un, avatar: av });
+    }
+
     if (route === 'GET leaderboard') {
       const j = +url.searchParams.get('jilid') || 0;
       const q = (url.searchParams.get('q') || '').trim().slice(0, 30);
       const rows = await sql`
         with best as (
           select user_id, jilid, level,
-                 max(round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total))::int xp
-          from attempts where ${j}::int = 0 or jilid = ${j}::int group by 1, 2, 3),
+                 max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
+          from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
-          select rank() over (order by sum(xp) desc)::int as rank, u.username,
-                 sum(xp)::int as total, count(distinct jilid)::int as jilids
-          from best join users u on u.id = best.user_id group by u.username)
+          select rank() over (order by sum(xp) desc)::int as rank, u.username, u.avatar,
+                 sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
+          from best join users u on u.id = best.user_id group by u.username, u.avatar)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
         order by rank, username limit 100`;
@@ -154,7 +193,7 @@ export async function onRequest({ request, env, params }) {
         select u.id, u.username, u.role,
           (select count(*) from attempts a where a.user_id = u.id)::int as attempts,
           coalesce((select sum(x) from (
-            select max(round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total)) x
+            select max(case when a.level = 'endless' then a.score::numeric else round((case a.level when 'easy' then 100 when 'medium' then 200 else 300 end) * a.correct::numeric / a.total) end) x
             from attempts a where a.user_id = u.id group by a.jilid, a.level) t), 0)::int as xp
         from users u
         where ${q}::text = '' or strpos(lower(u.username), lower(${q}::text)) > 0
