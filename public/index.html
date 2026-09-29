@@ -173,6 +173,13 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .fxg{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
 .fxi{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:22px 8px 12px;border-radius:16px;border:1px solid var(--line);background:var(--bg);opacity:.5}
 .fxi.on{opacity:1}.fxi.cur{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}.fxi small{color:var(--muted)}
+/* ===== Nilai quest & kelola soal ===== */
+select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;width:100%;margin-bottom:10px}textarea{resize:vertical}
+.lvl .gr{font-weight:800}
+.gtag{display:inline-block;font-weight:800;padding:2px 14px;border-radius:999px;color:#1a1a1a;margin:0 0 10px}
+.qrow{align-items:flex-start}.qrow .chk{margin:4px 0 0}.qrow .btn{flex:none;padding:8px 16px}
+.qopt{margin:4px 0 0;font-size:.85rem}.qopt b{color:var(--accent)}
+.pager{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px}
 </style>
 </head>
 <body>
@@ -277,9 +284,18 @@ function burst(x, y, n = 14) {
 /* ---------- Beranda ---------- */
 const JC = { 1: ['#C5DA2B', '#6F8A0A', '#1b2400'], 2: ['#2BA3E6', '#0E5C9C', '#04263f'], 3: ['#A94BC0', '#6A2A94', '#2a0a36'], 4: ['#F5A31A', '#B85C00', '#2b1500'] };
 const jst = j => `--c:${JC[j][0]};--d:${JC[j][1]};--fg:${JC[j][2]}`;
-/* Quest selesai = level bertanda ✅ (aturan persennya ada di server: PASS_PCT). Jilid selesai = 3 level selesai. Tathbiq terbuka = 4 jilid selesai. */
-const qd = (j, k) => (me.best[j + ':' + k] || 0) >= LV[k][2] * (me.pass || 100) / 100;
-const JN = j => Object.keys(LV).filter(k => qd(j, k)).length, JD = j => JN(j) === 3, TAT = () => [1, 2, 3, 4].every(JD);
+/* Quest selesai = level yang mencapai batas lulus (aturan persennya ada di server: PASS_PCT). Jilid selesai = 3 level selesai. Tathbiq terbuka = 4 jilid selesai. */
+const PASS = () => me.pass || 60;
+const qd = (j, k) => (me.best[j + ':' + k] || 0) >= LV[k][2] * PASS() / 100;
+/* Nilai quest dari persentase benar: Sempurna 100 · Mumtaz 90+ · Jayyid 75+ · Lulus (batas lulus, 60) */
+const GR = p => p >= 100 ? ['Sempurna', '💯', '#F2B705'] : p >= 90 ? ['Mumtaz', '🌟', '#2EAD5C'] : p >= 75 ? ['Jayyid', '👍', '#2BA3E6'] : p >= PASS() ? ['Lulus', '✅', '#9AA5B1'] : null;
+const pct = (j, k) => Math.round((me.best[j + ':' + k] || 0) / LV[k][2] * 100);
+const grOf = (j, k) => qd(j, k) ? GR(Math.max(pct(j, k), PASS())) : null;
+const JP = j => Object.keys(LV).every(k => pct(j, k) >= 100);
+/* Admin: semua fitur terbuka (Tathbiq, seluruh efek foto, seluruh pencapaian) */
+const ADM = () => !!me && me.role === 'admin';
+const AJD = j => ADM() || JD(j), TS = () => ADM() ? 7 : (me.tstage || 0);
+const JN = j => Object.keys(LV).filter(k => qd(j, k)).length, JD = j => JN(j) === 3, TAT = () => ADM() || [1, 2, 3, 4].every(JD);
 const RANKS = [[0, 'Bronze', '🥉', '#CD7F32'], [300, 'Silver', '🥈', '#B8C2CC'], [700, 'Gold', '🥇', '#F2B705'], [1200, 'Platinum', '🛡️', '#46C2B5'], [1800, 'Diamond', '💎', '#3AA9F0']];
 function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0);
@@ -288,11 +304,11 @@ function vHome() {
     <div class="card"><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span><h1><span id="tx">0</span> XP</h1><div class="prog"><i id="pg"></i></div>
     <p class="muted" style="margin:8px 0 0">${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</p></div>
     <div class="card" style="--i:2"><h2>Tingkatan rank</h2><div class="ranks">${RANKS.map((r, n) => `<div class="rnk ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${n <= ri ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div></div>
-    <div class="card endless" style="--i:3"><div><span class="tag">${TAT() ? '📚' : '🔒'} Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2>${TAT() ? `<p>3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!</p><small>Rekor: ${me.best['0:endless'] || 0} XP · Tahap tertinggi: ${me.tstage ? STG[me.tstage - 1][0] : '-'}</small>` : `<p>Terkunci. Selesaikan semua quest Jilid 1–4 (level bertanda ✅) untuk membuka mode ini.</p><small>Jilid selesai: ${[1, 2, 3, 4].filter(JD).length}/4</small>`}</div><button class="btn" id="endStart"${TAT() ? '' : ' disabled'}>${TAT() ? 'Mulai' : '🔒 Terkunci'}</button></div>
-    <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n + 1};${jst(j)}"><span class="tag">Jilid ${j}${JD(j) ? ' 🏅' : ' · ' + JN(j) + '/3'}</span><div class="lvls">` +
+    <div class="card endless" style="--i:3"><div><span class="tag">${TAT() ? '📚' : '🔒'} Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2>${TAT() ? `<p>3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!</p><small>Rekor: ${me.best['0:endless'] || 0} XP · Tahap tertinggi: ${me.tstage ? STG[me.tstage - 1][0] : '-'}</small>` : `<p>Terkunci. Selesaikan semua quest Jilid 1–4 (minimal ${PASS()}% benar di tiap level) untuk membuka mode ini.</p><small>Jilid selesai: ${[1, 2, 3, 4].filter(JD).length}/4</small>`}</div><button class="btn" id="endStart"${TAT() ? '' : ' disabled'}>${TAT() ? 'Mulai' : '🔒 Terkunci'}</button></div>
+    <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n + 1};${jst(j)}"><span class="tag">Jilid ${j}${JD(j) ? (JP(j) ? ' 💯' : ' 🏅') : ' · ' + JN(j) + '/3'}</span><div class="lvls">` +
       Object.entries(LV).map(([k, [nm, c, x, ic, cl]]) => {
         const b = me.best[j + ':' + k] || 0;
-        return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${qd(j, k) ? '<span class="done">✅</span>' : ''}</button>`;
+        return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal${grOf(j, k) ? ' · <span class="gr">' + grOf(j, k)[0] + '</span>' : ''}</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${grOf(j, k) ? '<span class="done" title="' + grOf(j, k)[0] + '">' + grOf(j, k)[1] + '</span>' : ''}</button>`;
       }).join('') + `</div></div>`).join('') + `</div>`;
   count($('#tx'), tot);
   $('#endStart').onclick = async () => { try { vEndless(await api('endless/start', {})); } catch (e) { alert(e.message); } };
@@ -347,6 +363,7 @@ function vResult(r, j, l, wrong) {
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
   V.innerHTML = `<div class="card res jc" style="${jst(j)}"><div class="big">${em}</div><span class="tag">Hasil · Jilid ${j} · ${LV[l][0]}</span>
     <h1><span id="rx">0</span> / ${LV[l][2]} XP</h1><p class="muted">${r.correct} dari ${r.total} soal benar · nilai ${r.score}</p>
+    ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus. Butuh minimal ${PASS()}% benar agar quest ini selesai.</p>`}
     <span class="chip pop">${gain ? '+' + gain + ' XP masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
     (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
@@ -410,7 +427,7 @@ const av = (k, sz = '', fx = 0) => {
   const n = Math.min(fx, 11), f = FXC[n - 1];
   return `<span class="avw ${sz} t${fxTier(n)} fx${n}" style="--c1:${f[0]};--c2:${f[1]}">${e}${n === 11 ? '<i class="crn">👑</i>' : ''}</span>`;
 };
-const myFx = () => [1, 2, 3, 4].filter(JD).length + (me.tstage || 0);
+const myFx = () => ADM() ? 11 : [1, 2, 3, 4].filter(JD).length + (me.tstage || 0);
 const FXN = n => n < 5 ? 'Khatam ' + n + ' jilid' : STG[n - 5][0];
 const fxGrid = k => { const m = myFx(); return Array.from({ length: 11 }, (_, i) => i + 1).map(n => `<div class="fxi${n <= m ? ' on' : ''}${n === m ? ' cur' : ''}">${av(k, 'md', n)}<b>${FXN(n)}</b><small>${n === m ? 'Sedang dipakai' : n < m ? 'Terbuka' : '🔒 Terkunci'}</small></div>`).join(''); };
 const STG = [['Tathbiq 1', '#1A7A3C', '📘'], ['Tathbiq 2', '#1573C4', '📗'], ['Tathbiq 3', '#7B2FA0', '📙'], ['Tathbiq 4', '#D9730D', '📕'], ['Tathbiq 5', '#C0392B', '📒'], ['Tathbiq 6', '#B3245B', '📚'], ['Takhossus', '#F2B705', '👑']];
@@ -432,10 +449,11 @@ const GUIDE = {
     <li>Jawaban langsung dicek dan tidak bisa diubah setelah dipilih.</li>
     <li>Total XP menentukan rank liga: ${RANKS.map(r => r[2] + ' ' + r[1] + ' ' + r[0]).join(' · ')} XP.</li>
     <li><b>Leaderboard</b> mengurutkan murid berdasarkan total XP. Bisa disaring per jilid, ada tab Tathbiq, dan ada kolom cari nama.</li>
-    <li>Level bertanda ✅ berarti quest selesai. Selesaikan ketiga level sebuah jilid untuk meraih <b>pencapaian jilid</b> itu. Setelah keempat jilid selesai, <b>Mode Tathbiq</b> terbuka.</li>
+    <li>Quest selesai bila benar minimal <b>60%</b>. Nilainya bertingkat: Lulus (60%+), Jayyid (75%+), Mumtaz (90%+), Sempurna (100%), dan tampil di tiap level. Jilid yang ketiga levelnya Sempurna bertanda 💯.</li>
+    <li>Level bertanda nilai berarti quest selesai. Selesaikan ketiga level sebuah jilid untuk meraih <b>pencapaian jilid</b> itu. Setelah keempat jilid selesai, <b>Mode Tathbiq</b> terbuka.</li>
     <li>Di <b>Profil</b> kamu bisa mengganti username dan foto (pilihan yang tersedia) serta melihat pencapaian.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus.</li></ul>`,
-  tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai.</li>
+  tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
     <li>Poin tiap jawaban benar = 10 × nomor tahap: Tathbiq 1 = +10, Tathbiq 2 = +20, … Takhossus mulai +70 dan terus naik tiap 10 soal.</li>
@@ -460,7 +478,7 @@ async function vProfile() {
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
     <div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
     <div class="card"><h2>Efek foto profil</h2><p class="muted">Setiap pencapaian menambah efek pada fotomu. Makin banyak pencapaian, makin megah efeknya. Puncaknya, Takhossus, berhias mahkota emas.</p><div class="fxg" id="fxg">${fxGrid(cur)}</div></div>
-    <div class="card"><h2>Pencapaian (${[1, 2, 3, 4].filter(JD).length + (me.tstage || 0)}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${JD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${JD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${JD(j) ? 'Semua quest selesai' : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < (me.tstage || 0) ? ' on' : ''}" style="--c:${s[1]}"><span>${i < (me.tstage || 0) ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>`;
+    <div class="card"><h2>Pencapaian (${myFx()}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${AJD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${AJD(j) ? (ADM() ? 'Terbuka (admin)' : 'Semua quest selesai') : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < TS() ? ' on' : ''}" style="--c:${s[1]}"><span>${i < TS() ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>`;
   V.querySelectorAll('.avb').forEach(b => b.onclick = () => { cur = b.dataset.a; V.querySelectorAll('.avb').forEach(x => x.classList.toggle('on', x === b)); $('#pav').innerHTML = av(cur, 'lg', myFx()); $('#fxg').innerHTML = fxGrid(cur); });
   $('#ps').onclick = async () => {
     try { const r = await api('profile', { username: $('#pu').value.trim(), avatar: cur }); me.username = r.username; me.avatar = r.avatar; renderChip(); toast('Profil disimpan', '✅'); vProfile(); }
@@ -498,7 +516,7 @@ async function vAdmin() {
   try { st = await api('admin/stats'); } catch (e) { V.textContent = e.message; return; }
   let rows = [];
   V.innerHTML = `<h1>Panel Admin</h1><div class="grid">` +
-    [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2>${st.q[j] || 0} soal</h2></div>`).join('') +
+    [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2 id="sc${j}">${st.q[j] || 0} soal</h2></div>`).join('') +
     `</div><div class="card"><p class="muted">Kolom Excel: <code>jilid, pertanyaan, A, B, C, D, jawaban</code> (jawaban = huruf A–D). ${st.users} murid · ${st.attempts} percobaan.</p>
     <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="tp">Unduh template Excel</button></div>
     <input type="file" id="fl" accept=".xlsx,.xls,.csv">
@@ -520,11 +538,76 @@ async function vAdmin() {
       $('#pv').textContent = rows.length + ' baris terbaca.'; $('#up').disabled = !rows.length;
     } catch (x) { $('#err').textContent = 'File tidak bisa dibaca.'; }
   };
+  adminQuestions();
   adminUsers();
   $('#up').onclick = async () => {
     try { const r = await api('admin/questions', { rows, replace: $('#rp').checked }); alert(r.added + ' soal ditambahkan.'); vAdmin(); }
     catch (e) { $('#err').textContent = e.message; }
   };
+}
+
+/* ---------- Admin: kelola soal ---------- */
+let qmJ = 0, qmQ = '', qmOff = 0;
+const QPAGE = 30;
+async function refreshStats() {
+  try { const st = await api('admin/stats'); [1, 2, 3, 4].forEach(j => { const e = $('#sc' + j); if (e) e.textContent = (st.q[j] || 0) + ' soal'; }); } catch (e) {}
+}
+function qEditor(r, done) {
+  r = r || { jilid: qmJ || 1, q: '', a: '', b: '', c: '', d: '', answer: 'A' };
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="box"><h2>${r.id ? 'Edit soal' : 'Tambah soal'}</h2>
+    <select id="qej">${[1, 2, 3, 4].map(j => `<option value="${j}"${j === r.jilid ? ' selected' : ''}>Jilid ${j}</option>`).join('')}</select>
+    <textarea id="qeq" rows="3" dir="auto" placeholder="Pertanyaan">${esc(r.q)}</textarea>
+    ${['a', 'b', 'c', 'd'].map(k => `<input id="qe${k}" dir="auto" placeholder="Pilihan ${k.toUpperCase()}" value="${esc(r[k])}" autocomplete="off">`).join('')}
+    <select id="qeans">${['A', 'B', 'C', 'D'].map(k => `<option value="${k}"${k === r.answer ? ' selected' : ''}>Jawaban benar: ${k}</option>`).join('')}</select>
+    <div class="err" id="qee"></div><div class="row"><button class="btn ghost" id="qex">Batal</button><button class="btn" id="qes">Simpan</button></div></div>`;
+  document.body.appendChild(m);
+  const close = () => m.remove(); m.querySelector('#qex').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+  m.querySelector('#qes').onclick = async () => {
+    const g = id => m.querySelector('#' + id).value;
+    try {
+      await api('admin/question-save', { id: r.id || 0, jilid: +g('qej'), q: g('qeq'), a: g('qea'), b: g('qeb'), c: g('qec'), d: g('qed'), answer: g('qeans') });
+      close(); toast(r.id ? 'Soal diperbarui' : 'Soal ditambahkan', '✅'); done();
+    } catch (e) { m.querySelector('#qee').textContent = e.message; }
+  };
+}
+function adminQuestions() {
+  V.insertAdjacentHTML('beforeend', `<div class="card" id="qm"><h2>Kelola soal</h2>
+    <div class="tabs">${['Semua', 1, 2, 3, 4].map((x, n) => `<button data-qj="${n}" class="${n === qmJ ? 'on' : ''}">${n ? 'Jilid ' + x : x}</button>`).join('')}</div>
+    <input type="search" id="qmq" placeholder="Cari isi pertanyaan…" value="${esc(qmQ)}" autocomplete="off">
+    <div class="row" style="margin:0 0 12px"><button class="btn" id="qmAdd">+ Tambah soal</button><button class="btn ghost del" id="qmDel" disabled>Hapus terpilih</button></div>
+    <div id="qml" class="muted">Memuat…</div></div>`);
+  let t, seq = 0, rows = [];
+  const sel = () => [...$('#qml').querySelectorAll('input[type=checkbox]:checked')].map(x => +x.dataset.id);
+  const sync = () => { const n = sel().length; $('#qmDel').disabled = !n; $('#qmDel').textContent = n ? `Hapus terpilih (${n})` : 'Hapus terpilih'; };
+  const load = async () => {
+    const my = ++seq;
+    try {
+      const d = await api(`admin/questions?jilid=${qmJ}&q=${encodeURIComponent(qmQ)}&offset=${qmOff}`);
+      if (my !== seq) return;
+      if (!d.rows.length && qmOff > 0) { qmOff = Math.max(0, qmOff - QPAGE); return load(); }
+      rows = d.rows;
+      $('#qml').innerHTML = (d.rows.length ? d.rows.map((r, n) => `<div class="urow qrow"><label class="chk"><input type="checkbox" data-id="${r.id}" aria-label="Pilih soal"></label>
+        <div style="flex:1;min-width:0"><span class="chip">Jilid ${r.jilid}</span> <b dir="auto" style="color:var(--ink)">${esc(r.q)}</b>
+        <div class="qopt" dir="auto">${['a', 'b', 'c', 'd'].map(k => k.toUpperCase() === r.answer ? `<b>✔ ${k.toUpperCase()}. ${esc(r[k])}</b>` : `${k.toUpperCase()}. ${esc(r[k])}`).join(' · ')}</div></div>
+        <button class="btn ghost" data-e="${n}">Edit</button></div>`).join('') : 'Tidak ada soal.') +
+        `<div class="pager"><button class="btn ghost" id="qpv"${qmOff ? '' : ' disabled'}>← Sebelumnya</button><span class="muted" style="margin:0">${d.total ? qmOff + 1 + '–' + (qmOff + d.rows.length) + ' dari ' + d.total : ''}</span><button class="btn ghost" id="qnx"${qmOff + QPAGE < d.total ? '' : ' disabled'}>Berikutnya →</button></div>`;
+      sync();
+      $('#qml').querySelectorAll('input[type=checkbox]').forEach(x => x.onchange = sync);
+      $('#qml').querySelectorAll('[data-e]').forEach(b => b.onclick = () => qEditor(rows[+b.dataset.e], () => { load(); refreshStats(); }));
+      $('#qpv').onclick = () => { qmOff = Math.max(0, qmOff - QPAGE); load(); };
+      $('#qnx').onclick = () => { qmOff += QPAGE; load(); };
+    } catch (e) { $('#qml').textContent = e.message; }
+  };
+  $('#qm').querySelectorAll('[data-qj]').forEach(b => b.onclick = () => { qmJ = +b.dataset.qj; qmOff = 0; $('#qm').querySelectorAll('[data-qj]').forEach(x => x.classList.toggle('on', x === b)); load(); });
+  $('#qmq').oninput = e => { qmQ = e.target.value.trim(); qmOff = 0; clearTimeout(t); t = setTimeout(load, 250); };
+  $('#qmAdd').onclick = () => qEditor(null, () => { load(); refreshStats(); });
+  $('#qmDel').onclick = async () => {
+    const ids = sel(); if (!ids.length) return;
+    if (!confirm(`Hapus ${ids.length} soal terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try { await api('admin/question-delete', { ids }); toast(ids.length + ' soal dihapus', '🗑️'); load(); refreshStats(); } catch (e) { alert(e.message); }
+  };
+  load();
 }
 
 function adminUsers() {
