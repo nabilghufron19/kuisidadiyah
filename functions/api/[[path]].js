@@ -5,6 +5,7 @@ const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, 
 const unb64 = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
 const bad = (m, s = 400) => J({ error: m }, s);
+const PASS_PCT = 100, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT = persen benar agar sebuah quest dianggap selesai
 const hmacKey = s => crypto.subtle.importKey('raw', enc.encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 
 async function sign(obj, secret) {
@@ -34,6 +35,13 @@ export async function onRequest({ request, env, params }) {
     return (await sql`select id, username, role, avatar from users where id = ${p.uid}`)[0] || null;
   };
   const authToken = id => sign({ k: 'auth', uid: id, exp: Date.now() + 6048e5 }, S);
+  const bestOf = uid => sql`select jilid, level, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
+    from attempts where user_id = ${uid} group by jilid, level`;
+  // [jilid1, jilid2, jilid3, jilid4] -> true bila ketiga level jilid itu selesai
+  const jilidDone = rows => {
+    const b = {}; for (const r of rows) b[r.jilid + ':' + r.level] = r.xp;
+    return [1, 2, 3, 4].map(j => Object.entries(XPMAX).every(([l, x]) => (b[j + ':' + l] || 0) >= x * PASS_PCT / 100));
+  };
 
   try {
     // ---------- Daftar & masuk ----------
@@ -62,10 +70,9 @@ export async function onRequest({ request, env, params }) {
     if (!u) return bad('Silakan masuk dulu', 401);
 
     if (route === 'GET me') {
-      const best = await sql`select jilid, level, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
-        from attempts where user_id = ${u.id} group by jilid, level`;
+      const best = await bestOf(u.id), ach = jilidDone(best);
       const [t] = await sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${u.id}`;
-      return J({ username: u.username, role: u.role, avatar: u.avatar, tstage: t.s, best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ username: u.username, role: u.role, avatar: u.avatar, tstage: t.s, pass: PASS_PCT, ach, tathbiq: ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -107,6 +114,7 @@ export async function onRequest({ request, env, params }) {
     }
 
     if (route === 'POST endless/start') {
+      if (!jilidDone(await bestOf(u.id)).every(Boolean)) return bad('Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai', 403);
       const [q] = await sql`select id, q, a, b, c, d from questions order by random() limit 1`;
       if (!q) return bad('Belum ada soal');
       const [r] = await sql`insert into endless_runs (user_id, asked, n, cur) values (${u.id}, ${[q.id]}::int[], 1, ${q.id}) returning id`;
