@@ -3,12 +3,20 @@ import { neon } from '@neondatabase/serverless';
 const enc = new TextEncoder();
 const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64 = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const bad = (m, s = 400) => J({ error: m }, s);
 const PASS_PCT = 60, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT = persen benar agar sebuah quest dianggap selesai
 const keyCache = new Map(); // CryptoKey cukup dibuat sekali per isolate, bukan tiap request
 const hmacKey = s => keyCache.get(s) || (keyCache.set(s, crypto.subtle.importKey('raw', enc.encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])), keyCache.get(s));
 const LB = new Map(), LB_TTL = 10000; // cache leaderboard per isolate (hasilnya sama untuk semua pengguna)
+const PW_MAX = 128;                       // batas panjang password (mencegah PBKDF2 pada input raksasa)
+const LOGIN_MAX = 8, LOGIN_MIN = 15;      // maksimal 8 kali gagal per username dalam 15 menit
+const DUMMY_SALT = new Uint8Array(16);    // dipakai bila username tidak ada, supaya waktu respons sama
+const safeEq = (a, b) => { // bandingkan string dengan waktu konstan
+  if (a.length !== b.length) return false;
+  let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+};
 
 async function sign(obj, secret) {
   const p = b64(enc.encode(JSON.stringify(obj)));
@@ -32,6 +40,13 @@ export async function onRequest({ request, env, params }) {
   const route = request.method + ' ' + [].concat(params.path || []).join('/');
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const authToken = id => sign({ k: 'auth', uid: id, exp: Date.now() + 6048e5 }, S);
+  // Pembatas percobaan login. locked() mengembalikan query (bisa dimasukkan ke sql.transaction).
+  const locked = k => sql`select 1 from login_attempts where key = ${k} and reset_at > now() and n >= ${LOGIN_MAX}`;
+  const failLogin = k => sql`insert into login_attempts (key, n, reset_at) values (${k}, 1, now() + make_interval(mins => ${LOGIN_MIN}::int))
+    on conflict (key) do update set
+      n = case when login_attempts.reset_at > now() then login_attempts.n + 1 else 1 end,
+      reset_at = case when login_attempts.reset_at > now() then login_attempts.reset_at else now() + make_interval(mins => ${LOGIN_MIN}::int) end`;
+  const tooMany = () => bad('Terlalu banyak percobaan gagal. Coba lagi dalam ' + LOGIN_MIN + ' menit.', 429);
   const bestOf = uid => sql`select jilid, level, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
     from attempts where user_id = ${uid} group by jilid, level`;
   // [jilid1, jilid2, jilid3, jilid4] -> true bila ketiga level jilid itu selesai
@@ -45,7 +60,7 @@ export async function onRequest({ request, env, params }) {
     if (route === 'POST register') {
       const un = String(body.username || ''), pw = String(body.password || '');
       if (!/^[A-Za-z0-9_]{3,20}$/.test(un)) return bad('Username 3–20 karakter: huruf, angka, atau _');
-      if (pw.length < 6) return bad('Password minimal 6 karakter');
+      if (pw.length < 6 || pw.length > PW_MAX) return bad('Password 6–' + PW_MAX + ' karakter');
       if ((await sql`select 1 from users where lower(username) = lower(${un}) limit 1`).length) return bad('Username sudah dipakai', 409);
       const salt = crypto.getRandomValues(new Uint8Array(16));
       try {
@@ -58,8 +73,13 @@ export async function onRequest({ request, env, params }) {
     }
     if (route === 'POST login') {
       const un = String(body.username || ''), pw = String(body.password || '');
-      const [u] = await sql`select id, pass_hash, salt from users where lower(username) = lower(${un})`;
-      if (!u || (await hash(pw, unb64(u.salt))) !== u.pass_hash) return bad('Username atau password salah', 401);
+      const lk = 'u:' + un.toLowerCase().slice(0, 40);
+      const [[lock], [u]] = await sql.transaction([locked(lk), sql`select id, pass_hash, salt from users where lower(username) = lower(${un})`]);
+      if (lock) return tooMany();
+      // selalu hitung hash (walau username tidak ada) agar waktu respons tidak membocorkan username yang terdaftar
+      const h = pw.length <= PW_MAX ? await hash(pw, u ? unb64(u.salt) : DUMMY_SALT) : '';
+      if (!u || !h || !safeEq(h, u.pass_hash)) { await failLogin(lk); return bad('Username atau password salah', 401); }
+      await sql`delete from login_attempts where key = ${lk}`;
       return J({ token: await authToken(u.id) });
     }
 
@@ -133,9 +153,13 @@ export async function onRequest({ request, env, params }) {
       if (!usr) return bad('Silakan masuk dulu', 401);
       if (usr.role !== 'admin' && !jilidDone(best).every(Boolean)) return bad('Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai', 403);
       // pilih soal acak + buat sesi dalam satu statement
-      const [r] = await sql`with q as (select id, q, a, b, c, d from questions order by random() limit 1),
-        ins as (insert into endless_runs (user_id, asked, n, cur) select ${uid}::int, array[q.id], 1, q.id from q returning id)
-        select ins.id as run, to_jsonb(q) as question from ins, q`;
+      // CTE bernama "pick" (bukan "q"): nama "q" bentrok dengan kolom q, sehingga to_jsonb(q) hanya menghasilkan teks pertanyaan
+      // dan soal tampil "undefined". Sesi lama yang belum selesai ditutup sekalian.
+      const [, [r]] = await sql.transaction([
+        sql`update endless_runs set done = true, cur = null where user_id = ${uid} and not done`,
+        sql`with pick as (select id, q, a, b, c, d from questions order by random() limit 1),
+          ins as (insert into endless_runs (user_id, asked, n, cur) select ${uid}::int, array[pick.id], 1, pick.id from pick returning id)
+          select ins.id as run, to_jsonb(pick) as question from ins, pick`]);
       if (!r) return bad('Belum ada soal');
       return J({ run: r.run, question: r.question, n: 1, lives: 3, score: 0 });
     }
@@ -149,7 +173,10 @@ export async function onRequest({ request, env, params }) {
         from endless_runs r left join questions q on q.id = r.cur
         where r.id = ${+body.run || 0} and r.user_id = ${uid}`;
       if (!r || r.done) return bad('Sesi endless sudah berakhir', 409);
-      if (!r.answer) return bad('Soal tidak ditemukan', 404);
+      if (!r.answer) { // soal dihapus admin saat sesi berjalan: akhiri sesi dengan rapi, skor tetap tersimpan
+        await sql`update endless_runs set done = true, cur = null where id = ${r.id}`;
+        return bad('Soal ini baru dihapus admin, sesi diakhiri. Skormu tetap tersimpan. Tekan Berhenti.', 410);
+      }
       const ok = r.answer === c, pts = ok ? 10 * Math.ceil(r.n / 10) : 0;
       const lives = r.lives - (ok ? 0 : 1), score = r.score + pts, correct = r.correct + (ok ? 1 : 0);
       const next = lives > 0 ? r.nxt : null;
@@ -167,6 +194,29 @@ export async function onRequest({ request, env, params }) {
       if (!upd.length) return bad('Jawaban ini sudah dikirim', 409);
       LB.clear();
       return J({ ok, answer: r.answer, pts, lives, score, correct, next, over, cleared: over && lives > 0 });
+    }
+
+    if (route === 'POST password') {
+      const oldPw = String(body.old || ''), np = String(body.password || '');
+      if (np.length < 6 || np.length > PW_MAX) return bad('Password baru 6–' + PW_MAX + ' karakter');
+      const [usr] = await sql`select username, pass_hash, salt from users where id = ${uid}`;
+      if (!usr) return bad('Silakan masuk dulu', 401);
+      const lk = 'u:' + usr.username.toLowerCase();
+      const [lock] = await locked(lk);
+      if (lock) return tooMany();
+      // 403 (bukan 401) supaya klien tidak mengira token habis lalu mengeluarkan pengguna
+      if (oldPw.length > PW_MAX || !safeEq(await hash(oldPw, unb64(usr.salt)), usr.pass_hash)) { await failLogin(lk); return bad('Password lama salah', 403); }
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      await sql.transaction([
+        sql`update users set pass_hash = ${await hash(np, salt)}, salt = ${b64(salt)} where id = ${uid}`,
+        sql`delete from login_attempts where key = ${lk}`]);
+      return J({ ok: true });
+    }
+
+    if (route === 'POST endless/stop') {
+      // tombol "Berhenti": tutup sesi agar tidak menggantung. Skor sudah tersimpan di attempts sejak jawaban terakhir.
+      await sql`update endless_runs set done = true, cur = null where id = ${+body.run || 0} and user_id = ${uid} and not done`;
+      return J({ ok: true });
     }
 
     if (route === 'POST profile') {
@@ -281,6 +331,20 @@ export async function onRequest({ request, env, params }) {
       try { await sql`delete from questions where id = any(${ids}::int[])`; }
       catch (e) { if (e.code === '23503') return bad('Soal masih terhubung ke data lain', 409); throw e; }
       return J({ deleted: ids.length });
+    }
+
+    if (route === 'POST admin/reset-password') {
+      const id = +body.id, np = String(body.password || '');
+      if (!id) return bad('ID tidak valid');
+      if (np.length < 6 || np.length > PW_MAX) return bad('Password baru 6–' + PW_MAX + ' karakter');
+      const [t] = await sql`select username, role from users where id = ${id}`;
+      if (!t) return bad('Pengguna tidak ditemukan', 404);
+      if (t.role === 'admin') return bad('Password akun admin diganti lewat menu Profil', 403);
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      await sql.transaction([
+        sql`update users set pass_hash = ${await hash(np, salt)}, salt = ${b64(salt)} where id = ${id}`,
+        sql`delete from login_attempts where key = ${'u:' + t.username.toLowerCase()}`]);
+      return J({ ok: true });
     }
 
     if (route === 'GET admin/users') {
