@@ -7,7 +7,8 @@
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"></noscript>
 <style>
 :root{--bg:#F0FAF4;--side:#E3F5EA;--surface:#fff;--ink:#0F2718;--muted:#4D7260;--line:#C5E4CF;--accent:#1A7A3C;--on:#fff;--soft:#D6F0E0;--lime:#2EAD5C;
 --body:"Plus Jakarta Sans","Amiri","Segoe UI",system-ui,sans-serif;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -191,6 +192,10 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .qrow{align-items:flex-start}.qrow .chk{margin:4px 0 0}.qrow .btn{flex:none;padding:8px 16px}
 .qopt{margin:4px 0 0;font-size:.85rem}.qopt b{color:var(--accent)}
 .pager{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px}
+/* ===== Performa ===== */
+.pz,.pz *,.pz *::before,.pz *::after{animation-play-state:paused!important}
+.lite .avw.t2,.lite .avw.t3,.lite .avw.t4,.lite .fire{animation:none!important;box-shadow:0 0 calc(var(--t,4px)*3) 0 var(--c1,#ff6a00)}
+.lite .fl{animation:none}
 </style>
 </head>
 <body>
@@ -214,7 +219,6 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
     <div class="scroll"><div class="wrap" id="view"></div><div class="credit">Powered by <b>Nabil Ghufron</b> 1447-1448 H</div></div>
   </main>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = s => document.querySelector(s), V = $('#view');
 const LV = { easy: ['Mudah', 10, 100, '🌱', 'e'], medium: ['Sedang', 20, 200, '⚡', 'm'], hard: ['Sulit', 30, 300, '🔥', 'h'] };
@@ -266,6 +270,8 @@ function vAuth() {
 
 /* ---------- Efek ---------- */
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Perangkat lawas: pulsa cahaya (box-shadow beranimasi) dimatikan, cincin berputar tetap jalan */
+if ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4 && /Android|Mobi/i.test(navigator.userAgent))) document.documentElement.classList.add('lite');
 const pick = a => a[Math.floor(Math.random() * a.length)];
 let tt;
 function typeIt(el, text) {
@@ -522,6 +528,7 @@ async function vProfile() {
 
 /* ---------- Leaderboard ---------- */
 let bq = '';
+let lio;
 async function vBoard(j = 0) {
   V.innerHTML = `<h1>Leaderboard</h1><div class="tabs">` +
     ['Semua', 1, 2, 3, 4, 'Tathbiq'].map((x, n) => `<button data-j="${n}" class="${n === j ? 'on' : ''}">${n === 5 ? '📚 Tathbiq' : n ? 'Jilid ' + x : x}</button>`).join('') +
@@ -538,6 +545,11 @@ async function vBoard(j = 0) {
       box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.rank === 1 && r.total > 0 ? ' top1' : ''}" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.avatar, '', r.fx, r.rank === 1 && r.total > 0)}<span>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
         : `<p class="muted">${bq ? 'Tidak ada murid bernama "' + esc(bq) + '".' : 'Belum ada nilai.'}</p>`;
       first = false;
+      if (window.IntersectionObserver) { // jeda animasi baris yang tidak terlihat
+        lio && lio.disconnect();
+        lio = new IntersectionObserver(es => es.forEach(x => x.target.classList.toggle('pz', !x.isIntersecting)), { rootMargin: '60px' });
+        box.querySelectorAll('.lrow').forEach(r => lio.observe(r));
+      }
     } catch (e) { $('#lbr').textContent = e.message; }
   };
   $('#sq').oninput = e => { bq = e.target.value.trim(); clearTimeout(t); t = setTimeout(load, 250); };
@@ -545,7 +557,15 @@ async function vBoard(j = 0) {
 }
 
 /* ---------- Admin ---------- */
+/* Pustaka Excel besar (~900 KB): hanya dimuat di Panel Admin, bukan untuk semua murid */
+let xlsxP;
+const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok, no) => {
+  const e = document.createElement('script'); e.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  e.onload = ok; e.onerror = () => { xlsxP = null; no(new Error('Gagal memuat pustaka Excel. Periksa koneksi internet.')); };
+  document.head.appendChild(e);
+});
 async function vAdmin() {
+  loadX().catch(() => {}); // mulai unduh di latar belakang
   let st;
   try { st = await api('admin/stats'); } catch (e) { V.textContent = e.message; return; }
   let rows = [];
@@ -556,13 +576,15 @@ async function vAdmin() {
     <input type="file" id="fl" accept=".xlsx,.xls,.csv">
     <label class="chk"><input type="checkbox" id="rp"> Ganti soal lama pada jilid yang ada di file</label>
     <div class="muted" id="pv"></div><div class="err" id="err"></div><button class="btn" id="up" disabled>Unggah soal</button></div>`;
-  $('#tp').onclick = () => {
+  $('#tp').onclick = async () => {
+    try { await loadX(); } catch (e) { alert(e.message); return; }
     const w = XLSX.utils.aoa_to_sheet([['jilid', 'pertanyaan', 'A', 'B', 'C', 'D', 'jawaban'], [1, 'Contoh pertanyaan?', 'Opsi 1', 'Opsi 2', 'Opsi 3', 'Opsi 4', 'A']]);
     const b = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(b, w, 'Soal'); XLSX.writeFile(b, 'template-soal.xlsx');
   };
   $('#fl').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     try {
+      await loadX();
       const wb = XLSX.read(await f.arrayBuffer());
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
       rows = raw.map(o => {
@@ -570,7 +592,7 @@ async function vAdmin() {
         return { jilid: +n.jilid, q: n.pertanyaan, a: n.a, b: n.b, c: n.c, d: n.d, answer: (n.jawaban || '').toUpperCase() };
       });
       $('#pv').textContent = rows.length + ' baris terbaca.'; $('#up').disabled = !rows.length;
-    } catch (x) { $('#err').textContent = 'File tidak bisa dibaca.'; }
+    } catch (x) { $('#err').textContent = /^Gagal memuat/.test(x.message) ? x.message : 'File tidak bisa dibaca.'; }
   };
   adminQuestions();
   adminUsers();
