@@ -71,7 +71,7 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .opt.ok{background:#1f9d55;border-color:#1f9d55;color:#fff;animation:pop .35s,glow .8s}
 .opt.no{background:#d64545;border-color:#d64545;color:#fff;animation:shake .45s}
 .opt.ok b,.opt.no b{color:#fff}
-.cur::after{content:'▌';color:var(--accent);animation:blink .8s infinite}
+h2.cur::after{content:'▌';color:var(--accent);animation:blink .8s infinite}
 .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}.meta .muted{margin:0}
 .chip{display:inline-block;background:var(--soft);padding:2px 14px;border-radius:999px;font-weight:700}.chip.pop{animation:pop .45s}
 .fb{margin-top:12px;padding:12px 16px;border-radius:14px;font-weight:700;animation:pop .35s}
@@ -173,6 +173,17 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .fxg{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
 .fxi{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:22px 8px 12px;border-radius:16px;border:1px solid var(--line);background:var(--bg);opacity:.5}
 .fxi.on{opacity:1}.fxi.cur{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}.fxi small{color:var(--muted)}
+/* ===== Pilih efek bingkai ===== */
+button.fxi{font:inherit;color:inherit;cursor:pointer;width:100%}button.fxi:disabled{cursor:not-allowed}button.fxi:not(:disabled):hover{border-color:var(--accent)}
+/* ===== Api untuk peringkat 1 ===== */
+@keyframes blaze{0%,100%{box-shadow:0 0 8px 2px #ff6a00,0 0 18px 6px rgba(255,60,0,.55)}50%{box-shadow:0 0 12px 4px #ffb300,0 0 28px 10px rgba(255,80,0,.75)}}
+@keyframes flick{0%,100%{transform:scale(1,1) rotate(-5deg)}30%{transform:scale(1.15,1.4) rotate(4deg)}60%{transform:scale(.9,1.1) rotate(-3deg)}}
+@keyframes flametxt{to{background-position:200% 0}}
+.fire{position:relative;display:inline-grid;flex:none;border-radius:50%;isolation:isolate;animation:blaze 1s ease-in-out infinite}
+.fl{position:absolute;font-style:normal;line-height:1;font-size:calc(var(--sz)*.62);z-index:-1;pointer-events:none;transform-origin:50% 90%;filter:drop-shadow(0 0 4px #ff6a00);animation:flick .7s ease-in-out infinite}
+.fl.f1{left:-14%;top:-26%;animation-delay:-.2s}.fl.f2{left:50%;top:-44%;margin-left:calc(var(--sz)*-.31);animation-delay:-.45s}.fl.f3{right:-14%;top:-26%;animation-delay:-.1s}
+.lrow.top1{background:linear-gradient(90deg,rgba(255,110,0,.24),rgba(255,190,0,.08));border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,120,0,.5)}
+.lrow.top1 .un>span:last-child{background:linear-gradient(90deg,#ff3d00,#ffb300,#ff3d00);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;animation:flametxt 2s linear infinite}
 /* ===== Nilai quest & kelola soal ===== */
 select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;width:100%;margin-bottom:10px}textarea{resize:vertical}
 .lvl .gr{font-weight:800}
@@ -297,6 +308,8 @@ const ADM = () => !!me && me.role === 'admin';
 const AJD = j => ADM() || JD(j), TS = () => ADM() ? 7 : (me.tstage || 0);
 const JN = j => Object.keys(LV).filter(k => qd(j, k)).length, JD = j => JN(j) === 3, TAT = () => ADM() || [1, 2, 3, 4].every(JD);
 const RANKS = [[0, 'Bronze', '🥉', '#CD7F32'], [300, 'Silver', '🥈', '#B8C2CC'], [700, 'Gold', '🥇', '#F2B705'], [1200, 'Platinum', '🛡️', '#46C2B5'], [1800, 'Diamond', '💎', '#3AA9F0']];
+const rkOf = t => RANKS.reduce((a, r, n) => t >= r[0] ? n : a, 0), totalXp = () => Object.values(me.best).reduce((a, b) => a + b, 0);
+function noteRank(t0) { const a = rkOf(t0), b = rkOf(totalXp()); if (b > a) setTimeout(() => toast(`Pencapaian baru: <b>${RANKS[b][2]} ${RANKS[b][1]}</b>! Rankmu naik.`, RANKS[b][2]), 500); }
 function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0);
   const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1];
@@ -357,7 +370,8 @@ function vQuiz(d, j, l) {
 function vResult(r, j, l, wrong) {
   const k = j + ':' + l, prev = me.best[k] || 0, gain = Math.max(0, r.xp - prev);
   const wasJ = JD(j), wasT = TAT();
-  me.best[k] = Math.max(prev, r.xp);
+  const t0 = totalXp();
+  me.best[k] = Math.max(prev, r.xp); noteRank(t0);
   if (!wasJ && JD(j)) toast(`Pencapaian baru: <b>Jilid ${j}</b> selesai!`, '🏅');
   if (!wasT && TAT()) setTimeout(() => toast('<b>Mode Tathbiq terbuka!</b> Semua quest Jilid 1–4 sudah selesai.', '🔓'), 900);
   const em = r.score >= 90 ? '🏆' : r.score >= 70 ? '🎉' : r.score >= 40 ? '👍' : '💪';
@@ -406,7 +420,8 @@ function vEndless(d) {
 }
 function vEndResult(r) {
   const prev = me.best['0:endless'] || 0, gain = Math.max(0, r.score - prev);
-  me.best['0:endless'] = Math.max(prev, r.score);
+  const t0 = totalXp();
+  me.best['0:endless'] = Math.max(prev, r.score); noteRank(t0);
   V.innerHTML = `<div class="card res"><div class="big">${gain ? '🏆' : '🏁'}</div><span class="tag">Hasil Tathbiq</span>
     <h1><span id="rx">0</span> XP</h1><p class="muted">${r.correct} benar dari ${r.answered} soal${r.cleared ? ' · semua soal berhasil dijawab!' : ''}</p>
     <span class="chip pop">${gain ? '+' + gain + ' XP masuk ke totalmu (rekor baru!)' : 'Rekor Tathbiq-mu: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
@@ -421,15 +436,26 @@ const AVS = [['🦁', '#F5A31A'], ['🦅', '#2BA3E6'], ['🐪', '#D2A15B'], ['�
 /* Efek foto: level efek = jumlah pencapaian (0-11). Tier 1: cincin (1-3) · 2: cincin berputar + cahaya (4-6) · 3: + titik mengorbit (7-10) · 4: emas + mahkota (11, Takhossus) */
 const FXC = [['#2EAD5C', '#2EAD5C'], ['#2BA3E6', '#2BA3E6'], ['#A94BC0', '#A94BC0'], ['#F5A31A', '#C5DA2B'], ['#22A052', '#7CFFA8'], ['#2B8FE0', '#7CD3FF'], ['#A44FD0', '#E0A0FF'], ['#F08A1E', '#FFD27A'], ['#E24B3B', '#FF9A8A'], ['#E0367A', '#FF8FC0'], ['#F2B705', '#FFF3B0']];
 const fxTier = n => n < 4 ? 1 : n < 7 ? 2 : n < 11 ? 3 : 4;
-const av = (k, sz = '', fx = 0) => {
+const avBase = (k, sz = '', fx = 0) => {
   const a = AVS[(parseInt(String(k || 'a1').slice(1)) - 1) || 0], e = `<span class="av ${sz}" style="background:${a[1]}">${a[0]}</span>`;
   if (!(fx > 0)) return e;
   const n = Math.min(fx, 11), f = FXC[n - 1];
   return `<span class="avw ${sz} t${fxTier(n)} fx${n}" style="--c1:${f[0]};--c2:${f[1]}">${e}${n === 11 ? '<i class="crn">👑</i>' : ''}</span>`;
 };
-const myFx = () => ADM() ? 11 : [1, 2, 3, 4].filter(JD).length + (me.tstage || 0);
+const av = (k, sz = '', fx = 0, fire = false) => {
+  const h = avBase(k, sz, fx);
+  return fire ? `<span class="fire" style="--sz:${{ '': 32, md: 52, lg: 84 }[sz] || 32}px">${h}<i class="fl f1">🔥</i><i class="fl f2">🔥</i><i class="fl f3">🔥</i></span>` : h;
+};
+/* Efek foto: maxFx = efek tertinggi yang terbuka; pilihan pengguna (me.fxp: null = otomatis, 0 = tanpa efek) tidak boleh melebihi maxFx */
+const maxFx = () => ADM() ? 11 : [1, 2, 3, 4].filter(JD).length + (me.tstage || 0);
+const fxOf = pk => pk == null ? maxFx() : Math.min(pk, maxFx());
+const myFx = () => fxOf(me.fxp);
 const FXN = n => n < 5 ? 'Khatam ' + n + ' jilid' : STG[n - 5][0];
-const fxGrid = k => { const m = myFx(); return Array.from({ length: 11 }, (_, i) => i + 1).map(n => `<div class="fxi${n <= m ? ' on' : ''}${n === m ? ' cur' : ''}">${av(k, 'md', n)}<b>${FXN(n)}</b><small>${n === m ? 'Sedang dipakai' : n < m ? 'Terbuka' : '🔒 Terkunci'}</small></div>`).join(''); };
+const fxGrid = (k, pk) => {
+  const mx = maxFx(), t = (d, n, name, sub, on, cur, dis) => `<button class="fxi${on ? ' on' : ''}${cur ? ' cur' : ''}" data-f="${d}"${dis ? ' disabled' : ''}>${av(k, 'md', n)}<b>${name}</b><small>${sub}</small></button>`;
+  return t('auto', mx, 'Otomatis', pk == null ? 'Dipakai' : 'Efek tertinggi', true, pk == null, false) + t(0, 0, 'Tanpa efek', pk === 0 ? 'Dipakai' : 'Polos', true, pk === 0, false) +
+    Array.from({ length: 11 }, (_, i) => i + 1).map(n => t(n, n, FXN(n), pk === n ? 'Dipakai' : n <= mx ? 'Terbuka' : '🔒 Terkunci', n <= mx, pk === n, n > mx)).join('');
+};
 const STG = [['Tathbiq 1', '#1A7A3C', '📘'], ['Tathbiq 2', '#1573C4', '📗'], ['Tathbiq 3', '#7B2FA0', '📙'], ['Tathbiq 4', '#D9730D', '📕'], ['Tathbiq 5', '#C0392B', '📒'], ['Tathbiq 6', '#B3245B', '📚'], ['Takhossus', '#F2B705', '👑']];
 const stg = n => STG[Math.min(Math.ceil(n / 10), 7) - 1];
 const stgStyle = n => `background:${stg(n)[1]};color:${Math.ceil(n / 10) > 6 ? '#1a1a1a' : '#fff'}`;
@@ -452,7 +478,8 @@ const GUIDE = {
     <li>Quest selesai bila benar minimal <b>60%</b>. Nilainya bertingkat: Lulus (60%+), Jayyid (75%+), Mumtaz (90%+), Sempurna (100%), dan tampil di tiap level. Jilid yang ketiga levelnya Sempurna bertanda 💯.</li>
     <li>Level bertanda nilai berarti quest selesai. Selesaikan ketiga level sebuah jilid untuk meraih <b>pencapaian jilid</b> itu. Setelah keempat jilid selesai, <b>Mode Tathbiq</b> terbuka.</li>
     <li>Di <b>Profil</b> kamu bisa mengganti username dan foto (pilihan yang tersedia) serta melihat pencapaian.</li>
-    <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus.</li></ul>`,
+    <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
+    <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, dan Diamond diraih dari total XP. Peringkat 1 di leaderboard mendapat bingkai api 🔥.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
@@ -471,19 +498,26 @@ async function vProfile() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   try { Object.assign(me, await api('me')); } catch (e) { V.textContent = e.message; return; }
   const xp = Object.values(me.best).reduce((a, b) => a + b, 0), ri = RANKS.reduce((a, r, n) => xp >= r[0] ? n : a, 0);
-  let cur = me.avatar || 'a1';
-  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg', myFx())}</div><div><h1>${esc(me.username)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span>
+  let cur = me.avatar || 'a1', pk = me.fxp == null ? null : me.fxp;
+  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg', fxOf(pk))}</div><div><h1>${esc(me.username)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span>
     <p class="muted">${xp} XP · Rekor Tathbiq ${me.best['0:endless'] || 0} XP</p></div></div>
     <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Pilih foto:</p>
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
     <div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
-    <div class="card"><h2>Efek foto profil</h2><p class="muted">Setiap pencapaian menambah efek pada fotomu. Makin banyak pencapaian, makin megah efeknya. Puncaknya, Takhossus, berhias mahkota emas.</p><div class="fxg" id="fxg">${fxGrid(cur)}</div></div>
-    <div class="card"><h2>Pencapaian (${myFx()}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${AJD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${AJD(j) ? (ADM() ? 'Terbuka (admin)' : 'Semua quest selesai') : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < TS() ? ' on' : ''}" style="--c:${s[1]}"><span>${i < TS() ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>`;
-  V.querySelectorAll('.avb').forEach(b => b.onclick = () => { cur = b.dataset.a; V.querySelectorAll('.avb').forEach(x => x.classList.toggle('on', x === b)); $('#pav').innerHTML = av(cur, 'lg', myFx()); $('#fxg').innerHTML = fxGrid(cur); });
-  $('#ps').onclick = async () => {
-    try { const r = await api('profile', { username: $('#pu').value.trim(), avatar: cur }); me.username = r.username; me.avatar = r.avatar; renderChip(); toast('Profil disimpan', '✅'); vProfile(); }
-    catch (e) { $('#err').textContent = e.message; }
+    <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(cur, pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan efek</button></div></div>
+    <div class="card"><h2>Pencapaian (${myFx()}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${AJD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${AJD(j) ? (ADM() ? 'Terbuka (admin)' : 'Semua quest selesai') : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < TS() ? ' on' : ''}" style="--c:${s[1]}"><span>${i < TS() ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>
+    <div class="card"><h2>Pencapaian rank (${ADM() ? 5 : ri + 1}/5)</h2><p class="muted">Naik rank dengan mengumpulkan total XP.</p><div class="ach">${RANKS.map((r, n) => { const on = ADM() || n <= ri; return `<div class="ac${on ? ' on' : ''}" style="--c:${r[3]}"><span>${on ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${on ? (ADM() ? 'Terbuka (admin)' : 'Tercapai') : r[0] + ' XP'}</small></div>`; }).join('')}</div></div>`;
+  const refresh = () => {
+    $('#pav').innerHTML = av(cur, 'lg', fxOf(pk)); $('#fxg').innerHTML = fxGrid(cur, pk);
+    $('#fxg').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { pk = b.dataset.f === 'auto' ? null : +b.dataset.f; refresh(); });
   };
+  V.querySelectorAll('.avb').forEach(b => b.onclick = () => { cur = b.dataset.a; V.querySelectorAll('.avb').forEach(x => x.classList.toggle('on', x === b)); refresh(); });
+  const save = async () => {
+    try { const r = await api('profile', { username: $('#pu').value.trim(), avatar: cur, fx: pk }); me.username = r.username; me.avatar = r.avatar; me.fxp = r.fx; renderChip(); toast('Profil disimpan', '✅'); vProfile(); }
+    catch (e) { $('#err').textContent = e.message; toast(e.message, '⚠️'); }
+  };
+  $('#ps').onclick = save; $('#fxs').onclick = save;
+  refresh();
 }
 
 /* ---------- Leaderboard ---------- */
@@ -501,7 +535,7 @@ async function vBoard(j = 0) {
       if (my !== seq) return;
       const box = $('#lbr');
       box.classList.toggle('nofx', !first);
-      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.avatar, '', r.fx)}<span>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
+      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.rank === 1 && r.total > 0 ? ' top1' : ''}" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.avatar, '', r.fx, r.rank === 1 && r.total > 0)}<span>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
         : `<p class="muted">${bq ? 'Tidak ada murid bernama "' + esc(bq) + '".' : 'Belum ada nilai.'}</p>`;
       first = false;
     } catch (e) { $('#lbr').textContent = e.message; }
