@@ -3,10 +3,12 @@ import { neon } from '@neondatabase/serverless';
 const enc = new TextEncoder();
 const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64 = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
+const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const bad = (m, s = 400) => J({ error: m }, s);
 const PASS_PCT = 60, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT = persen benar agar sebuah quest dianggap selesai
-const hmacKey = s => crypto.subtle.importKey('raw', enc.encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+const keyCache = new Map(); // CryptoKey cukup dibuat sekali per isolate, bukan tiap request
+const hmacKey = s => keyCache.get(s) || (keyCache.set(s, crypto.subtle.importKey('raw', enc.encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])), keyCache.get(s));
+const LB = new Map(), LB_TTL = 10000; // cache leaderboard per isolate (hasilnya sama untuk semua pengguna)
 
 async function sign(obj, secret) {
   const p = b64(enc.encode(JSON.stringify(obj)));
@@ -29,17 +31,9 @@ export async function onRequest({ request, env, params }) {
   const sql = neon(env.DATABASE_URL), S = env.JWT_SECRET, url = new URL(request.url);
   const route = request.method + ' ' + [].concat(params.path || []).join('/');
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
-  const auth = async () => {
-    const p = await verify((request.headers.get('Authorization') || '').slice(7), S);
-    if (!p || p.k !== 'auth') return null;
-    return (await sql`select id, username, role, avatar, fx from users where id = ${p.uid}`)[0] || null;
-  };
   const authToken = id => sign({ k: 'auth', uid: id, exp: Date.now() + 6048e5 }, S);
   const bestOf = uid => sql`select jilid, level, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
     from attempts where user_id = ${uid} group by jilid, level`;
-  const tstageOf = async id => (await sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${id}`)[0].s;
-  // efek foto tertinggi yang terbuka: khatam jilid + tahap Tathbiq (admin: 11 = semua)
-  const fxMax = async usr => usr.role === 'admin' ? 11 : jilidDone(await bestOf(usr.id)).filter(Boolean).length + await tstageOf(usr.id);
   // [jilid1, jilid2, jilid3, jilid4] -> true bila ketiga level jilid itu selesai
   const jilidDone = rows => {
     const b = {}; for (const r of rows) b[r.jilid + ':' + r.level] = r.xp;
@@ -70,13 +64,23 @@ export async function onRequest({ request, env, params }) {
     }
 
     // ---------- Wajib masuk ----------
-    const u = await auth();
-    if (!u) return bad('Silakan masuk dulu', 401);
+    // Token bertanda tangan sudah cukup untuk tahu siapa pemanggilnya (uid). Data user dari DB
+    // (getUser) hanya diambil di rute yang memerlukannya: profil dan admin.
+    const claim = await verify((request.headers.get('Authorization') || '').slice(7), S);
+    const uid = claim && claim.k === 'auth' ? +claim.uid : 0;
+    if (!uid) return bad('Silakan masuk dulu', 401);
+    let cachedUser;
+    const getUser = async () => cachedUser ||= (await sql`select id, username, role, avatar, fx from users where id = ${uid}`)[0] || null;
 
     if (route === 'GET me') {
-      const best = await bestOf(u.id), ach = jilidDone(best);
-      const [t] = await sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${u.id}`;
-      return J({ username: u.username, role: u.role, avatar: u.avatar, fxp: u.fx, tstage: t.s, pass: PASS_PCT, ach, tathbiq: u.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      // satu round trip untuk tiga query
+      const [[usr], best, [t]] = await sql.transaction([
+        sql`select username, role, avatar, fx from users where id = ${uid}`,
+        bestOf(uid),
+        sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`]);
+      if (!usr) return bad('Silakan masuk dulu', 401);
+      const ach = jilidDone(best);
+      return J({ username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -85,91 +89,116 @@ export async function onRequest({ request, env, params }) {
       if (!(j >= 1 && j <= 4) || !n) return bad('Pilihan tidak valid');
       const qs = await sql`select id, q, a, b, c, d from questions where jilid = ${j} order by random() limit ${n}`;
       if (!qs.length) return bad('Belum ada soal untuk jilid ini');
-      const token = await sign({ k: 'quiz', uid: u.id, j, l, ids: qs.map(x => x.id), nonce: crypto.randomUUID(), exp: Date.now() + 72e5 }, S);
+      const token = await sign({ k: 'quiz', uid, j, l, ids: qs.map(x => x.id), nonce: crypto.randomUUID(), exp: Date.now() + 72e5 }, S);
       return J({ questions: qs, token });
     }
 
     if (route === 'POST check') {
       const t = await verify(String(body.token || ''), S);
-      if (!t || t.k !== 'quiz' || t.uid !== u.id) return bad('Sesi kuis tidak valid atau kedaluwarsa');
+      if (!t || t.k !== 'quiz' || t.uid !== uid) return bad('Sesi kuis tidak valid atau kedaluwarsa');
       const id = +body.id, c = String(body.choice || '');
       if (!t.ids.includes(id) || !/^[ABCD]$/.test(c)) return bad('Jawaban tidak valid');
-      const [r] = await sql`select answer from questions where id = ${id}`;
+      // satu round trip: ambil kunci jawaban + catat jawaban (ok dihitung di database)
+      const [[r], ins] = await sql.transaction([
+        sql`select answer from questions where id = ${id}`,
+        sql`insert into quiz_answers (nonce, qid, ok) values (${t.nonce}, ${id}, coalesce((select answer from questions where id = ${id}) = ${c}, false)) on conflict do nothing returning ok`]);
       if (!r) return bad('Soal tidak ditemukan');
-      const ok = r.answer === c;
-      const ins = await sql`insert into quiz_answers (nonce, qid, ok) values (${t.nonce}, ${id}, ${ok}) on conflict do nothing returning qid`;
       if (!ins.length) return bad('Soal ini sudah dijawab', 409);
-      return J({ ok, answer: r.answer });
+      return J({ ok: ins[0].ok, answer: r.answer });
     }
 
     if (route === 'POST submit') {
       const t = await verify(String(body.token || ''), S);
-      if (!t || t.k !== 'quiz' || t.uid !== u.id) return bad('Sesi kuis tidak valid atau kedaluwarsa');
+      if (!t || t.k !== 'quiz' || t.uid !== uid) return bad('Sesi kuis tidak valid atau kedaluwarsa');
       const total = t.ids.length, XP = { easy: 100, medium: 200, hard: 300 };
-      const [{ n }] = await sql`select count(*)::int n from quiz_answers where nonce = ${t.nonce} and ok`;
-      const score = Math.round(n * 100 / total), xp = Math.round(XP[t.l] * n / total);
+      let row;
       try {
-        await sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce) values (${u.id}, ${t.j}, ${t.l}, ${total}, ${n}, ${score}, ${t.nonce})`;
+        // hitung benar + simpan percobaan dalam satu statement
+        [row] = await sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
+          values (${uid}, ${t.j}, ${t.l}, ${total},
+            (select count(*)::int from quiz_answers where nonce = ${t.nonce} and ok),
+            (select round(count(*) * 100.0 / ${total})::int from quiz_answers where nonce = ${t.nonce} and ok),
+            ${t.nonce})
+          returning correct, score`;
       } catch (e) {
         if (e.code === '23505') return bad('Kuis ini sudah pernah dikirim', 409);
         throw e;
       }
-      return J({ correct: n, total, score, xp });
+      LB.clear();
+      return J({ correct: row.correct, total, score: row.score, xp: Math.round(XP[t.l] * row.correct / total) });
     }
 
     if (route === 'POST endless/start') {
-      if (u.role !== 'admin' && !jilidDone(await bestOf(u.id)).every(Boolean)) return bad('Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai', 403);
-      const [q] = await sql`select id, q, a, b, c, d from questions order by random() limit 1`;
-      if (!q) return bad('Belum ada soal');
-      const [r] = await sql`insert into endless_runs (user_id, asked, n, cur) values (${u.id}, ${[q.id]}::int[], 1, ${q.id}) returning id`;
-      return J({ run: r.id, question: q, n: 1, lives: 3, score: 0 });
+      const [[usr], best] = await sql.transaction([sql`select role from users where id = ${uid}`, bestOf(uid)]);
+      if (!usr) return bad('Silakan masuk dulu', 401);
+      if (usr.role !== 'admin' && !jilidDone(best).every(Boolean)) return bad('Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai', 403);
+      // pilih soal acak + buat sesi dalam satu statement
+      const [r] = await sql`with q as (select id, q, a, b, c, d from questions order by random() limit 1),
+        ins as (insert into endless_runs (user_id, asked, n, cur) select ${uid}::int, array[q.id], 1, q.id from q returning id)
+        select ins.id as run, to_jsonb(q) as question from ins, q`;
+      if (!r) return bad('Belum ada soal');
+      return J({ run: r.run, question: r.question, n: 1, lives: 3, score: 0 });
     }
 
     if (route === 'POST endless/answer') {
       const c = String(body.choice || '');
       if (!/^[ABCD]$/.test(c)) return bad('Jawaban tidak valid');
-      const [r] = await sql`select * from endless_runs where id = ${+body.run || 0} and user_id = ${u.id}`;
+      // sesi + kunci jawaban + kandidat soal berikutnya dalam satu query
+      const [r] = await sql`select r.id, r.lives, r.score, r.correct, r.n, r.cur, r.done, r.asked, q.answer,
+          (select to_jsonb(x) from (select id, q, a, b, c, d from questions where id <> all(r.asked) order by random() limit 1) x) as nxt
+        from endless_runs r left join questions q on q.id = r.cur
+        where r.id = ${+body.run || 0} and r.user_id = ${uid}`;
       if (!r || r.done) return bad('Sesi endless sudah berakhir', 409);
-      const [q] = await sql`select answer from questions where id = ${r.cur}`;
-      if (!q) return bad('Soal tidak ditemukan', 404);
-      const ok = q.answer === c, pts = ok ? 10 * Math.ceil(r.n / 10) : 0;
+      if (!r.answer) return bad('Soal tidak ditemukan', 404);
+      const ok = r.answer === c, pts = ok ? 10 * Math.ceil(r.n / 10) : 0;
       const lives = r.lives - (ok ? 0 : 1), score = r.score + pts, correct = r.correct + (ok ? 1 : 0);
-      let next = null;
-      if (lives > 0) [next] = await sql`select id, q, a, b, c, d from questions where id <> all(${r.asked}::int[]) order by random() limit 1`;
+      const next = lives > 0 ? r.nxt : null;
       const over = !next, n = next ? r.n + 1 : r.n;
-      const upd = await sql`update endless_runs set lives = ${lives}, score = ${score}, correct = ${correct}, n = ${n},
-        asked = ${next ? [...r.asked, next.id] : r.asked}::int[], cur = ${next ? next.id : null}, done = ${over}
-        where id = ${r.id} and cur = ${r.cur} and not done returning id`;
+      // satu round trip: update (dijaga dengan cur/done) + catat percobaan dari kondisi terbaru di DB.
+      // Percobaan dibaca dari baris sesi itu sendiri, jadi dua request bersamaan tidak bisa saling menimpa.
+      const [upd] = await sql.transaction([
+        sql`update endless_runs set lives = ${lives}, score = ${score}, correct = ${correct}, n = ${n},
+          asked = ${next ? [...r.asked, next.id] : r.asked}::int[], cur = ${next ? next.id : null}, done = ${over}
+          where id = ${r.id} and cur = ${r.cur} and not done returning id`,
+        sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
+          select user_id, 0, 'endless', case when done then n else n - 1 end, correct, score, 'endless-' || id
+          from endless_runs where id = ${r.id}
+          on conflict (nonce) do update set total = excluded.total, correct = excluded.correct, score = excluded.score`]);
       if (!upd.length) return bad('Jawaban ini sudah dikirim', 409);
-      await sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
-        values (${u.id}, 0, 'endless', ${r.n}, ${correct}, ${score}, ${'endless-' + r.id})
-        on conflict (nonce) do update set total = excluded.total, correct = excluded.correct, score = excluded.score`;
-      return J({ ok, answer: q.answer, pts, lives, score, correct, next, over, cleared: over && lives > 0 });
+      LB.clear();
+      return J({ ok, answer: r.answer, pts, lives, score, correct, next, over, cleared: over && lives > 0 });
     }
 
     if (route === 'POST profile') {
+      const u = await getUser();
+      if (!u) return bad('Silakan masuk dulu', 401);
       const un = String(body.username ?? u.username).trim(), av = String(body.avatar ?? u.avatar);
       if (!/^[A-Za-z0-9_]{3,20}$/.test(un)) return bad('Username 3–20 karakter: huruf, angka, atau _');
       if (!/^a([1-9]|1[0-2])$/.test(av)) return bad('Foto tidak valid');
-      if ((await sql`select 1 from users where lower(username) = lower(${un}) and id <> ${u.id} limit 1`).length) return bad('Username sudah dipakai', 409);
       let fx = u.fx;
-      if (body.fx !== undefined) {
-        if (body.fx === null) fx = null;
-        else {
-          const n = +body.fx;
-          if (!Number.isInteger(n) || n < 0 || n > 11) return bad('Efek tidak valid');
-          if (n > await fxMax(u)) return bad('Efek ini belum terbuka', 403);
-          fx = n;
-        }
+      if (body.fx === null) fx = null;
+      else if (body.fx !== undefined) {
+        const n = +body.fx;
+        if (!Number.isInteger(n) || n < 0 || n > 11) return bad('Efek tidak valid');
+        fx = n;
       }
+      const needFx = fx > 0 && u.role !== 'admin' && fx !== u.fx; // admin bebas; efek yang sudah dipakai tak perlu dicek ulang
+      const qs = [sql`select 1 from users where lower(username) = lower(${un}) and id <> ${u.id} limit 1`];
+      if (needFx) qs.push(bestOf(u.id), sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${u.id}`);
+      const [dup, best, st] = await sql.transaction(qs);
+      if (dup.length) return bad('Username sudah dipakai', 409);
+      if (needFx && fx > jilidDone(best).filter(Boolean).length + st[0].s) return bad('Efek ini belum terbuka', 403);
       try { await sql`update users set username = ${un}, avatar = ${av}, fx = ${fx} where id = ${u.id}`; }
       catch (e) { if (e.code === '23505') return bad('Username sudah dipakai', 409); throw e; }
+      LB.clear();
       return J({ username: un, avatar: av, fx });
     }
 
     if (route === 'GET leaderboard') {
       const j = +url.searchParams.get('jilid') || 0;
       const q = (url.searchParams.get('q') || '').trim().slice(0, 30);
+      const ck = j + '|' + q.toLowerCase(), hit = LB.get(ck);
+      if (hit && hit.t > Date.now()) return J(hit.v);
       const rows = await sql`
         with best as (
           select user_id, jilid, level,
@@ -193,10 +222,15 @@ export async function onRequest({ request, env, params }) {
         for (const r of ts) st[r.user_id] = r.s;
       }
       for (const r of rows) { const mx = r.role === 'admin' ? 11 : jilidDone(by[r.id] || []).filter(Boolean).length + (st[r.id] || 0); r.fx = r.pick == null ? mx : Math.min(r.pick, mx); delete r.id; delete r.role; delete r.pick; }
-      return J({ rows });
+      const out = { rows };
+      if (LB.size > 60) LB.clear();
+      LB.set(ck, { t: Date.now() + LB_TTL, v: out });
+      return J(out);
     }
 
     // ---------- Khusus admin ----------
+    const u = await getUser();
+    if (!u) return bad('Silakan masuk dulu', 401);
     if (u.role !== 'admin') return bad('Khusus admin', 403);
 
     if (route === 'GET admin/stats') {
@@ -272,11 +306,13 @@ export async function onRequest({ request, env, params }) {
       if (!t) return bad('Pengguna tidak ditemukan', 404);
       if (t.role === 'admin') return bad('Akun admin tidak bisa dihapus dari sini', 403);
       await sql`delete from users where id = ${id}`;
+      LB.clear();
       return J({ ok: true });
     }
 
     return bad('Tidak ditemukan', 404);
   } catch (e) {
+    if (e.code === '23503') return bad('Silakan masuk dulu', 401); // akun sudah dihapus
     console.error(e);
     return bad('Kesalahan server', 500);
   }
