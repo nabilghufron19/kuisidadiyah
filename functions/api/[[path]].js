@@ -32,11 +32,14 @@ export async function onRequest({ request, env, params }) {
   const auth = async () => {
     const p = await verify((request.headers.get('Authorization') || '').slice(7), S);
     if (!p || p.k !== 'auth') return null;
-    return (await sql`select id, username, role, avatar from users where id = ${p.uid}`)[0] || null;
+    return (await sql`select id, username, role, avatar, fx from users where id = ${p.uid}`)[0] || null;
   };
   const authToken = id => sign({ k: 'auth', uid: id, exp: Date.now() + 6048e5 }, S);
   const bestOf = uid => sql`select jilid, level, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
     from attempts where user_id = ${uid} group by jilid, level`;
+  const tstageOf = async id => (await sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${id}`)[0].s;
+  // efek foto tertinggi yang terbuka: khatam jilid + tahap Tathbiq (admin: 11 = semua)
+  const fxMax = async usr => usr.role === 'admin' ? 11 : jilidDone(await bestOf(usr.id)).filter(Boolean).length + await tstageOf(usr.id);
   // [jilid1, jilid2, jilid3, jilid4] -> true bila ketiga level jilid itu selesai
   const jilidDone = rows => {
     const b = {}; for (const r of rows) b[r.jilid + ':' + r.level] = r.xp;
@@ -73,7 +76,7 @@ export async function onRequest({ request, env, params }) {
     if (route === 'GET me') {
       const best = await bestOf(u.id), ach = jilidDone(best);
       const [t] = await sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${u.id}`;
-      return J({ username: u.username, role: u.role, avatar: u.avatar, tstage: t.s, pass: PASS_PCT, ach, tathbiq: u.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ username: u.username, role: u.role, avatar: u.avatar, fxp: u.fx, tstage: t.s, pass: PASS_PCT, ach, tathbiq: u.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -149,9 +152,19 @@ export async function onRequest({ request, env, params }) {
       if (!/^[A-Za-z0-9_]{3,20}$/.test(un)) return bad('Username 3–20 karakter: huruf, angka, atau _');
       if (!/^a([1-9]|1[0-2])$/.test(av)) return bad('Foto tidak valid');
       if ((await sql`select 1 from users where lower(username) = lower(${un}) and id <> ${u.id} limit 1`).length) return bad('Username sudah dipakai', 409);
-      try { await sql`update users set username = ${un}, avatar = ${av} where id = ${u.id}`; }
+      let fx = u.fx;
+      if (body.fx !== undefined) {
+        if (body.fx === null) fx = null;
+        else {
+          const n = +body.fx;
+          if (!Number.isInteger(n) || n < 0 || n > 11) return bad('Efek tidak valid');
+          if (n > await fxMax(u)) return bad('Efek ini belum terbuka', 403);
+          fx = n;
+        }
+      }
+      try { await sql`update users set username = ${un}, avatar = ${av}, fx = ${fx} where id = ${u.id}`; }
       catch (e) { if (e.code === '23505') return bad('Username sudah dipakai', 409); throw e; }
-      return J({ username: un, avatar: av });
+      return J({ username: un, avatar: av, fx });
     }
 
     if (route === 'GET leaderboard') {
@@ -163,9 +176,9 @@ export async function onRequest({ request, env, params }) {
                  max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
           from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
-          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role,
+          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick,
                  sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
-          from best join users u on u.id = best.user_id group by u.id, u.username, u.avatar, u.role)
+          from best join users u on u.id = best.user_id group by u.id, u.username, u.avatar, u.role, u.fx)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
         order by rank, username limit 100`;
@@ -179,7 +192,7 @@ export async function onRequest({ request, env, params }) {
         for (const r of bs) (by[r.user_id] ||= []).push(r);
         for (const r of ts) st[r.user_id] = r.s;
       }
-      for (const r of rows) { r.fx = r.role === 'admin' ? 11 : jilidDone(by[r.id] || []).filter(Boolean).length + (st[r.id] || 0); delete r.id; delete r.role; }
+      for (const r of rows) { const mx = r.role === 'admin' ? 11 : jilidDone(by[r.id] || []).filter(Boolean).length + (st[r.id] || 0); r.fx = r.pick == null ? mx : Math.min(r.pick, mx); delete r.id; delete r.role; delete r.pick; }
       return J({ rows });
     }
 
