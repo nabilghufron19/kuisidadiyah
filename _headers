@@ -1,4 +1,15 @@
 # Cloudflare Pages: taruh di folder yang sama dengan index.html.
+# Catatan: aturan di file ini hanya berlaku untuk berkas statis. Respons /api/* memakai header dari kodenya sendiri.
+
+# Header keamanan untuk semua halaman.
+# CSP mengizinkan inline script/style (aplikasi memakainya), Google Fonts, dan cdnjs (pustaka Excel di Panel Admin).
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
 # Gambar di-cache 1 hari di browser (kunjungan berikutnya tidak perlu unduh ulang).
 /*.png
   Cache-Control: public, max-age=86400
