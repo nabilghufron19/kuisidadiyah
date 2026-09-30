@@ -1,0 +1,6 @@
+# Cloudflare Pages: taruh di folder yang sama dengan index.html.
+# Gambar di-cache 1 hari di browser (kunjungan berikutnya tidak perlu unduh ulang).
+/*.png
+  Cache-Control: public, max-age=86400
+/*.webp
+  Cache-Control: public, max-age=86400
