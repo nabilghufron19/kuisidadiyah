@@ -254,6 +254,7 @@ function vAuth() {
     <div class="err" id="err"></div><button class="btn" id="go">Masuk</button></div>`;
   V.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
     mode = b.dataset.m;
+    $('#p').setAttribute('autocomplete', mode === 'login' ? 'current-password' : 'new-password');
     V.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
     $('#go').textContent = mode === 'login' ? 'Masuk' : 'Daftar';
   });
@@ -404,7 +405,7 @@ function vEndless(d) {
     const h = $('#qt'), all = V.querySelectorAll('.opt'), text = q.q;
     typeIt(h, text);
     h.onclick = () => { clearInterval(tt); h.textContent = text; h.classList.remove('cur'); };
-    $('#st').onclick = () => vEndResult({ score, correct, answered });
+    $('#st').onclick = () => { api('endless/stop', { run }).catch(() => {}); vEndResult({ score, correct, answered }); };
     all.forEach(b => b.onclick = async () => {
       all.forEach(x => x.disabled = true); $('#st').disabled = true;
       try {
@@ -483,7 +484,7 @@ const GUIDE = {
     <li><b>Leaderboard</b> mengurutkan murid berdasarkan total XP. Bisa disaring per jilid, ada tab Tathbiq, dan ada kolom cari nama.</li>
     <li>Quest selesai bila benar minimal <b>60%</b>. Nilainya bertingkat: Lulus (60%+), Jayyid (75%+), Mumtaz (90%+), Sempurna (100%), dan tampil di tiap level. Jilid yang ketiga levelnya Sempurna bertanda 💯.</li>
     <li>Level bertanda nilai berarti quest selesai. Selesaikan ketiga level sebuah jilid untuk meraih <b>pencapaian jilid</b> itu. Setelah keempat jilid selesai, <b>Mode Tathbiq</b> terbuka.</li>
-    <li>Di <b>Profil</b> kamu bisa mengganti username dan foto (pilihan yang tersedia) serta melihat pencapaian.</li>
+    <li>Di <b>Profil</b> kamu bisa mengganti username, foto, dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, dan Diamond diraih dari total XP. Peringkat 1 di leaderboard mendapat bingkai api 🔥.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
@@ -510,6 +511,7 @@ async function vProfile() {
     <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Pilih foto:</p>
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
     <div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
+    <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div>
     <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(cur, pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan efek</button></div></div>
     <div class="card"><h2>Pencapaian (${myFx()}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${AJD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${AJD(j) ? (ADM() ? 'Terbuka (admin)' : 'Semua quest selesai') : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < TS() ? ' on' : ''}" style="--c:${s[1]}"><span>${i < TS() ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>
     <div class="card"><h2>Pencapaian rank (${ADM() ? 5 : ri + 1}/5)</h2><p class="muted">Naik rank dengan mengumpulkan total XP.</p><div class="ach">${RANKS.map((r, n) => { const on = ADM() || n <= ri; return `<div class="ac${on ? ' on' : ''}" style="--c:${r[3]}"><span>${on ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${on ? (ADM() ? 'Terbuka (admin)' : 'Tercapai') : r[0] + ' XP'}</small></div>`; }).join('')}</div></div>`;
@@ -523,6 +525,16 @@ async function vProfile() {
     catch (e) { $('#err').textContent = e.message; toast(e.message, '⚠️'); }
   };
   $('#ps').onclick = save; $('#fxs').onclick = save;
+  $('#pws').onclick = async () => {
+    const o = $('#pwo').value, n = $('#pwn').value, err = $('#perr');
+    if (!o) { err.textContent = 'Isi password lama'; return; }
+    if (n.length < 6) { err.textContent = 'Password baru minimal 6 karakter'; return; }
+    if (n !== $('#pwn2').value) { err.textContent = 'Ulangi password baru dengan sama persis'; return; }
+    try {
+      await api('password', { old: o, password: n });
+      ['#pwo', '#pwn', '#pwn2'].forEach(x => $(x).value = ''); err.textContent = ''; toast('Password diganti', '✅');
+    } catch (e) { err.textContent = e.message; }
+  };
   refresh();
 }
 
@@ -558,9 +570,12 @@ async function vBoard(j = 0) {
 
 /* ---------- Admin ---------- */
 /* Pustaka Excel besar (~900 KB): hanya dimuat di Panel Admin, bukan untuk semua murid */
+/* SRI: isi dengan hasil `curl -s <URL_XLSX> | openssl dgst -sha512 -binary | openssl base64 -A`, diawali "sha512-".
+   Bila diisi, browser menolak file yang isinya berubah. Kosong = tanpa pengecekan. */
+const SRI = '';
 let xlsxP;
 const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok, no) => {
-  const e = document.createElement('script'); e.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  const e = document.createElement('script'); e.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; if (SRI) { e.integrity = SRI; e.crossOrigin = 'anonymous'; }
   e.onload = ok; e.onerror = () => { xlsxP = null; no(new Error('Gagal memuat pustaka Excel. Periksa koneksi internet.')); };
   document.head.appendChild(e);
 });
@@ -674,8 +689,13 @@ function adminUsers() {
     try {
       const d = await api('admin/users?q=' + encodeURIComponent($('#uq').value.trim()));
       if (my !== seq) return;
-      $('#ul').innerHTML = (d.users.length ? d.users.map(x => `<div class="urow"><div><b>${esc(x.username)}</b>${x.role === 'admin' ? ' <span class="chip">admin</span>' : ''}<div class="muted" style="margin:0;font-size:.85rem">${x.xp} XP · ${x.attempts} percobaan</div></div>${x.role === 'admin' ? '' : `<button class="btn ghost del" data-id="${x.id}" data-n="${esc(x.username)}">Hapus</button>`}</div>`).join('') : 'Tidak ada murid ditemukan.') +
+      $('#ul').innerHTML = (d.users.length ? d.users.map(x => `<div class="urow"><div><b>${esc(x.username)}</b>${x.role === 'admin' ? ' <span class="chip">admin</span>' : ''}<div class="muted" style="margin:0;font-size:.85rem">${x.xp} XP · ${x.attempts} percobaan</div></div>${x.role === 'admin' ? '' : `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" style="padding:8px 16px" data-rp="${x.id}" data-n="${esc(x.username)}">Reset password</button><button class="btn ghost del" data-id="${x.id}" data-n="${esc(x.username)}">Hapus</button></div>`}</div>`).join('') : 'Tidak ada murid ditemukan.') +
         (d.total > d.users.length ? `<p class="muted">Menampilkan ${d.users.length} dari ${d.total}. Gunakan pencarian.</p>` : '');
+      $('#ul').querySelectorAll('[data-rp]').forEach(b => b.onclick = async () => {
+        const pw = prompt(`Password baru untuk "${b.dataset.n}" (6–128 karakter). Sampaikan ke murid, lalu sarankan menggantinya di Profil.`);
+        if (pw === null) return;
+        try { await api('admin/reset-password', { id: +b.dataset.rp, password: pw }); toast('Password ' + esc(b.dataset.n) + ' direset', '🔑'); } catch (e) { alert(e.message); }
+      });
       $('#ul').querySelectorAll('.del').forEach(b => b.onclick = async () => {
         if (!confirm(`Hapus akun "${b.dataset.n}" beserta semua nilainya? Tindakan ini tidak bisa dibatalkan.`)) return;
         try { await api('admin/delete-user', { id: +b.dataset.id }); load(); } catch (e) { alert(e.message); }
