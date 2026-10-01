@@ -199,8 +199,8 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 /* ===== Spin hadiah ===== */
 .reel{position:relative;overflow:hidden;border-radius:18px;background:var(--bg);border:1px solid var(--line);margin:14px 0;padding:12px 0}
 .strip{display:flex;gap:8px;width:max-content;will-change:transform}
-.pt{flex:0 0 96px;height:84px;border-radius:14px;display:grid;place-items:center;font-weight:800;font-size:1.1rem;color:#fff;background:var(--pc);box-shadow:inset 0 -6px 0 rgba(0,0,0,.18)}
-.pt.win{animation:winp .6s ease-out infinite alternate;z-index:1}
+.pz{flex:0 0 96px;height:84px;border-radius:14px;display:grid;place-items:center;font-weight:800;font-size:1.1rem;color:#fff;background:var(--pc);box-shadow:inset 0 -6px 0 rgba(0,0,0,.18)}
+.pz.win{animation:winp .6s ease-out infinite alternate;z-index:1}
 .ptr{position:absolute;left:50%;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;box-shadow:0 0 10px 2px var(--accent)}
 @keyframes winp{to{transform:scale(1.14);filter:brightness(1.25)}}
 /* ===== Toko ===== */
@@ -428,7 +428,7 @@ async function vDaily() {
   let d; try { d = await api('daily'); } catch (e) { V.textContent = e.message; return; }
   const t = d.today, tot = d.prizes.reduce((a, p) => a + p[1], 0), WIN = 36;
   const ms = 864e5 - ((Date.now() + 252e5) % 864e5), left = Math.floor(ms / 36e5) + ' jam ' + Math.floor(ms % 36e5 / 6e4) + ' menit'; // hari baru = pukul 00.00 WIB
-  const tile = g => `<div class="pt" style="--pc:${PRIZE_C[g]}">${GL} ${g}</div>`;
+  const tile = g => `<div class="pz" style="--pc:${PRIZE_C[g]}">${GL} ${g}</div>`;
   const status = !t ? `<p>10 soal acak dari semua jilid. Nilai minimal <b>${DAILY_PASS}</b> untuk mendapat <b>1× spin hadiah</b>, hadiah tertinggi <b>${GL} 1000</b>! Hanya satu kesempatan per hari dan tidak bisa diulang.</p><button class="btn" id="dgo">Mulai kuis harian</button>`
     : !t.done ? '<p>Kuis hari ini sudah dimulai tapi tidak diselesaikan, jadi kesempatan hari ini hangus. Coba lagi besok.</p>'
     : t.score >= DAILY_PASS ? `<p>Hasil hari ini: <b>${t.correct}/10</b> benar (nilai ${t.score}). ${t.spun ? 'Hadiah spinmu: ' + GL + ' ' + t.prize + ' 🎉' : 'Spin hadiahmu menunggu di atas!'}</p>`
@@ -436,7 +436,7 @@ async function vDaily() {
   V.innerHTML = '<h1>Kuis Harian</h1>' +
     (d.pending ? `<div class="card spin"><span class="tag">🎰 Spin hadiah</span><h2>Kamu punya ${d.pending} spin!</h2><div class="reel"><div class="strip" id="strip"></div><i class="ptr"></i></div><div id="spmsg"></div><div class="row"><span></span><button class="btn" id="spin">Putar!</button></div></div>` : '') +
     `<div class="card"><span class="tag">🎯 Hari ini</span>${status}<p class="muted" style="margin:8px 0 0">Kuis diperbarui dalam ${left} (pukul 00.00 WIB).</p></div>
-    <div class="card"><h2>Hadiah spin</h2>${d.prizes.map(([g, w]) => `<div class="urow"><span class="pt" style="--pc:${PRIZE_C[g]};flex:0 0 auto;height:34px;padding:0 14px;font-size:.95rem">${GL} ${g}</span><span class="muted" style="margin:0">peluang ${+(w / tot * 100).toFixed(1)}%</span></div>`).join('')}
+    <div class="card"><h2>Hadiah spin</h2>${d.prizes.map(([g, w]) => `<div class="urow"><span class="pz" style="--pc:${PRIZE_C[g]};flex:0 0 auto;height:34px;padding:0 14px;font-size:.95rem">${GL} ${g}</span><span class="muted" style="margin:0">peluang ${+(w / tot * 100).toFixed(1)}%</span></div>`).join('')}
     <p class="muted" style="margin:8px 0 0">Jaminan: spin ke-${d.need} sejak hadiah langka terakhir pasti mendapat ${GL} ${d.rare} atau lebih. Spin berikutnya adalah yang ke-${d.pity + 1}.</p></div>`;
   const go1 = $('#dgo'); if (go1) go1.onclick = async () => {
     if (!confirm('Kamu hanya punya satu kesempatan hari ini dan tidak bisa mengulang. Jangan tutup halaman sebelum selesai. Mulai sekarang?')) return;
