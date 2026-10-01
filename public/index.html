@@ -196,6 +196,48 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .pz,.pz *,.pz *::before,.pz *::after{animation-play-state:paused!important}
 .lite .avw.t2,.lite .avw.t3,.lite .avw.t4,.lite .fire{animation:none!important;box-shadow:0 0 calc(var(--t,4px)*3) 0 var(--c1,#ff6a00)}
 .lite .fl{animation:none}
+/* ===== Beranda (dirapikan) ===== */
+.hello{margin:0 0 14px}
+.hero{padding:22px;margin-bottom:26px;border-top:5px solid var(--rc)}
+.hero .top2{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.hero .who{display:flex;align-items:center;gap:14px}
+.hero .who small{display:block;color:var(--muted);font-weight:600;line-height:1.2}
+.hero .who b{font-size:1.35rem;line-height:1.25}
+.medal{width:64px;height:64px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:2rem;background:var(--rc);box-shadow:0 8px 20px -8px var(--rc)}
+.hero .xpb{text-align:right}.hero .xpb h1{margin:0 0 6px;line-height:1}.hero .xpb h1 small{font-size:1rem;color:var(--muted);font-weight:700}
+.hero .prog{height:12px;margin:18px 0 8px}
+.hero .cap{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.88rem;font-weight:600;flex-wrap:wrap}
+.track{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin-top:22px}
+.track::before,.track::after{content:'';position:absolute;top:19px;left:10%;height:4px;border-radius:4px}
+.track::before{right:10%;background:var(--line)}
+.track::after{width:calc(80% * var(--p));background:linear-gradient(90deg,var(--lime),var(--rc))}
+.stp{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;min-width:0}
+.stp .dot{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:1.2rem;background:var(--surface);border:3px solid var(--line);margin-bottom:6px}
+.stp.done .dot{background:var(--rc);border-color:var(--rc)}
+.stp.cur .dot{background:var(--rc);border-color:var(--ink);box-shadow:0 0 0 5px color-mix(in srgb,var(--rc) 35%,transparent)}
+.stp.lock{opacity:.55}
+.stp b{font-size:.82rem;line-height:1.2;overflow-wrap:anywhere}.stp small{color:var(--muted);font-weight:600;font-size:.72rem}
+.sec{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap;margin:4px 0 12px}
+.sec h2{margin:0;font-size:1.3rem}.sec span{color:var(--muted);font-size:.9rem}
+.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:28px}
+.mode{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:6px;padding:20px;border-radius:22px 22px 22px 6px;color:#fff}
+.mode.dly{background:linear-gradient(135deg,#B45309,#F59E0B)}
+.mode.tth{background:linear-gradient(135deg,#3b1d8f,#c2317a)}
+.mode.off{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+.mode .tag{align-self:flex-start;background:rgba(255,255,255,.22);color:inherit;margin:0}.mode.off .tag{background:var(--line)}
+.mode h2{margin:4px 0 0;font-size:1.2rem;color:inherit}
+.mode p{margin:0;flex:1;font-size:.92rem;opacity:.92}
+.mode .ft{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+.mode .ft small{font-weight:700;opacity:.95;min-width:0}
+.mode .btn{flex:none;background:#fff;color:#7a3a05}.mode.tth .btn{color:#3b1d8f}.mode.off .btn{background:var(--surface);color:var(--ink)}
+.mode .ico{position:absolute;right:-4px;top:-14px;font-size:5.5rem;opacity:.16;transform:rotate(12deg);pointer-events:none}
+.mode small.badge{background:#fff;color:#8a4205;padding:2px 12px;border-radius:999px;opacity:1}
+.jh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}.jh .tag{margin:0}
+.jst{font-weight:700;color:var(--muted);font-size:.88rem}
+.lvl{min-height:128px}.lvl b{line-height:1.2}.lvl small{font-size:.76rem;line-height:1.25}
+@media(max-width:820px){.modes{grid-template-columns:1fr}}
+@media(max-width:700px){.grid.jgrid{grid-template-columns:1fr}}
+@media(max-width:420px){.hero{padding:16px}.medal{width:52px;height:52px;font-size:1.6rem}.hero .xpb{text-align:left}.stp .dot{width:36px;height:36px;font-size:1rem}.track::before,.track::after{top:16px}.stp small{font-size:.66rem}}
 /* ===== Spin hadiah ===== */
 .reel{position:relative;overflow:hidden;border-radius:18px;background:var(--bg);border:1px solid var(--line);margin:14px 0;padding:12px 0}
 .strip{display:flex;gap:8px;width:max-content;will-change:transform}
@@ -678,15 +720,28 @@ const RANKS = [[0, 'Bronze', '🥉', '#CD7F32'], [300, 'Silver', '🥈', '#B8C2C
 const rkOf = t => RANKS.reduce((a, r, n) => t >= r[0] ? n : a, 0), totalXp = () => Object.values(me.best).reduce((a, b) => a + b, 0);
 function noteRank(t0) { const a = rkOf(t0), b = rkOf(totalXp()); if (b > a) setTimeout(() => toast(`Pencapaian baru: <b>${RANKS[b][2]} ${RANKS[b][1]}</b>! Rankmu naik.`, RANKS[b][2]), 500); }
 function vHome() {
-  const tot = Object.values(me.best).reduce((a, b) => a + b, 0);
-  const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1];
-  V.innerHTML = `<h1>Assalamu'alaikum, ${esc(me.username)}</h1>
-    <div class="card"><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span><span class="gold" style="margin:0 0 10px 8px">${GL} ${gold()}</span><h1><span id="tx">0</span> XP</h1><div class="prog"><i id="pg"></i></div>
-    <p class="muted" style="margin:8px 0 0">${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</p></div>
-    <div class="card endless" style="--i:2"><div><span class="tag">🎯 Kuis Harian</span><h2>10 soal acak · spin hadiah sampai ${GL} 1000</h2><small>Nilai minimal 80. Satu kesempatan per hari.</small></div><button class="btn" id="dailyGo">Buka</button></div>
-    <div class="card" style="--i:2"><h2>Tingkatan rank</h2><div class="ranks">${RANKS.map((r, n) => `<div class="rnk ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${n <= ri ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div></div>
-    <div class="card endless" style="--i:3"><div><span class="tag">${TAT() ? '📚' : '🔒'} Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2>${TAT() ? `<p>3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!</p><small>Rekor: ${me.best['0:endless'] || 0} XP · Tahap tertinggi: ${me.tstage ? STG[me.tstage - 1][0] : '-'}</small>` : `<p>Terkunci. Selesaikan semua quest Jilid 1–4 (minimal ${PASS()}% benar di tiap level) untuk membuka mode ini.</p><small>Jilid selesai: ${[1, 2, 3, 4].filter(JD).length}/4</small>`}</div><button class="btn" id="endStart"${TAT() ? '' : ' disabled'}>${TAT() ? 'Mulai' : '🔒 Terkunci'}</button></div>
-    <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n + 1};${jst(j)}"><span class="tag">Jilid ${j}${JD(j) ? (JP(j) ? ' 💯' : ' 🏅') : ' · ' + JN(j) + '/3'}</span><div class="lvls">` +
+  const tot = Object.values(me.best).reduce((a, b) => a + b, 0), tat = TAT();
+  const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1], rk = RANKS[ri];
+  const frac = nx ? (tot - rk[0]) / (nx[0] - rk[0]) : 1, p = Math.min(1, (ri + frac) / (RANKS.length - 1));
+  V.innerHTML = `<h1 class="hello">Assalamu'alaikum, ${esc(me.username)}</h1>
+    <div class="card hero" style="--rc:${rk[3]}">
+      <div class="top2"><div class="who"><span class="medal">${rk[2]}</span><div><small>Tingkat saat ini</small><b>${rk[1]}</b></div></div>
+        <div class="xpb"><h1><span id="tx">0</span> <small>XP</small></h1><span class="gold">${GL} ${gold()}</span></div></div>
+      <div class="prog"><i id="pg"></i></div>
+      <div class="cap"><span>${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</span><span>${tot}${nx ? ' / ' + nx[0] : ''} XP</span></div>
+      <div class="track" style="--p:${p}">${RANKS.map((r, n) => `<div class="stp ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${n <= ri ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
+    </div>
+    <div class="sec"><h2>Tantangan</h2><span>Kuis harian dan mode tanpa batas</span></div>
+    <div class="modes">
+      <div class="mode dly"><span class="ico">🎯</span><span class="tag">🎯 Kuis Harian</span><h2>10 soal acak, spin hadiah</h2>
+        <p>Nilai minimal ${DAILY_PASS} untuk memutar hadiah sampai ${GL} 1000. Satu kesempatan per hari.</p>
+        <div class="ft"><small id="dst">Satu kesempatan per hari</small><button class="btn" id="dailyGo">Buka</button></div></div>
+      <div class="mode ${tat ? 'tth' : 'off'}"><span class="ico">${tat ? '📚' : '🔒'}</span><span class="tag">${tat ? '📚' : '🔒'} Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2>
+        <p>${tat ? '3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!' : 'Selesaikan semua quest Jilid 1–4 (minimal ' + PASS() + '% benar di tiap level) untuk membuka mode ini.'}</p>
+        <div class="ft"><small>${tat ? 'Rekor ' + (me.best['0:endless'] || 0) + ' XP · Tahap ' + (me.tstage ? STG[me.tstage - 1][0] : '-') : 'Jilid selesai: ' + [1, 2, 3, 4].filter(JD).length + '/4'}</small><button class="btn" id="endStart"${tat ? '' : ' disabled'}>${tat ? 'Mulai' : '🔒 Terkunci'}</button></div></div>
+    </div>
+    <div class="sec"><h2>Quest Jilid</h2><span>Minimal ${PASS()}% benar di tiap level agar quest selesai</span></div>
+    <div class="grid jgrid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n};${jst(j)}"><div class="jh"><span class="tag">Jilid ${j}</span><span class="jst">${JD(j) ? (JP(j) ? '💯 Sempurna' : '🏅 Selesai') : JN(j) + '/3 level selesai'}</span></div><div class="lvls">` +
       Object.entries(LV).map(([k, [nm, c, x, ic, cl]]) => {
         const b = me.best[j + ':' + k] || 0;
         return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal${grOf(j, k) ? ' · <span class="gr">' + grOf(j, k)[0] + '</span>' : ''}</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${grOf(j, k) ? '<span class="done" title="' + grOf(j, k)[0] + '">' + grOf(j, k)[1] + '</span>' : ''}</button>`;
@@ -694,11 +749,13 @@ function vHome() {
   count($('#tx'), tot);
   $('#dailyGo').onclick = () => go('daily');
   $('#endStart').onclick = async () => { try { vEndless(await api('endless/start', {})); } catch (e) { alert(e.message); } };
-  setTimeout(() => { $('#pg').style.background = RANKS[ri][3]; $('#pg').style.width = (nx ? (tot - RANKS[ri][0]) / (nx[0] - RANKS[ri][0]) * 100 : 100) + '%'; }, 80);
+  setTimeout(() => { const g = $('#pg'); if (g) { g.style.background = rk[3]; g.style.width = frac * 100 + '%'; } }, 80);
   V.querySelectorAll('.lvl').forEach(b => b.onclick = async () => {
     try { vQuiz(await api(`quiz?jilid=${b.dataset.j}&level=${b.dataset.l}`), +b.dataset.j, b.dataset.l); }
     catch (e) { alert(e.message); }
   });
+  // status kuis harian dimuat belakangan agar beranda tampil langsung
+  api('daily').then(d => { const e = $('#dst'); if (!e) return; const t = d.today; e.textContent = d.pending ? '🎰 Spin hadiah siap!' : !t ? 'Belum dikerjakan hari ini' : !t.done ? 'Hari ini hangus' : '✅ Selesai · nilai ' + t.score; if (d.pending) e.classList.add('badge'); }).catch(() => {});
 }
 
 /* ---------- Kuis ---------- */
