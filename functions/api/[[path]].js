@@ -278,9 +278,20 @@ export async function onRequest({ request, env, params }) {
     if (u.role !== 'admin') return bad('Khusus admin', 403);
 
     if (route === 'GET admin/stats') {
-      const q = await sql`select jilid, count(*)::int n from questions group by jilid`;
-      const [c] = await sql`select (select count(*) from users where role = 'student')::int users, (select count(*) from attempts)::int attempts`;
-      return J({ q: Object.fromEntries(q.map(r => [r.jilid, r.n])), ...c });
+      // statistik hanya menghitung murid (bukan admin). Batas rank harus sama dengan RANKS di index.html: 300/700/1200/1800.
+      const [q, [c], bj, [rk]] = await sql.transaction([
+        sql`select jilid, count(*)::int n from questions group by jilid`,
+        sql`select (select count(*) from users where role = 'student')::int users,
+          (select count(*) from users where role = 'student' and created_at > now() - interval '7 days')::int new7,
+          (select count(*) from attempts a join users u on u.id = a.user_id and u.role = 'student')::int attempts,
+          (select count(distinct a.user_id) from attempts a join users u on u.id = a.user_id and u.role = 'student' where a.created_at > now() - interval '7 days')::int active7`,
+        sql`select a.jilid, count(*)::int attempts, count(distinct a.user_id)::int students, coalesce(round(avg(a.score)), 0)::int avg
+          from attempts a join users u on u.id = a.user_id and u.role = 'student' where a.jilid between 1 and 4 group by a.jilid`,
+        sql`with best as (select user_id, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts group by user_id, jilid, level),
+          tot as (select u.id, coalesce(sum(b.xp), 0)::int t from users u left join best b on b.user_id = u.id where u.role = 'student' group by u.id)
+          select count(*) filter (where t < 300)::int r0, count(*) filter (where t >= 300 and t < 700)::int r1, count(*) filter (where t >= 700 and t < 1200)::int r2,
+            count(*) filter (where t >= 1200 and t < 1800)::int r3, count(*) filter (where t >= 1800)::int r4 from tot`]);
+      return J({ q: Object.fromEntries(q.map(r => [r.jilid, r.n])), ...c, byJilid: Object.fromEntries(bj.map(r => [r.jilid, r])), ranks: [rk.r0, rk.r1, rk.r2, rk.r3, rk.r4] });
     }
 
     if (route === 'POST admin/questions') {
@@ -345,6 +356,7 @@ export async function onRequest({ request, env, params }) {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 30);
       const users = await sql`
         select u.id, u.username, u.role,
+          (select max(a.created_at) from attempts a where a.user_id = u.id) as last,
           (select count(*) from attempts a where a.user_id = u.id)::int as attempts,
           coalesce((select sum(x) from (
             select max(case when a.level = 'endless' then a.score::numeric else round((case a.level when 'easy' then 100 when 'medium' then 200 else 300 end) * a.correct::numeric / a.total) end) x
@@ -354,6 +366,17 @@ export async function onRequest({ request, env, params }) {
         order by u.username limit 50`;
       const [{ n }] = await sql`select count(*)::int n from users where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0`;
       return J({ users, total: n });
+    }
+
+    if (route === 'GET admin/user') {
+      const id = +url.searchParams.get('id') || 0;
+      const [[t], best, recent, [en]] = await sql.transaction([
+        sql`select id, username, role, created_at from users where id = ${id}`,
+        bestOf(id),
+        sql`select jilid, level, correct, total, score, created_at from attempts where user_id = ${id} order by created_at desc limit 10`,
+        sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int s from endless_runs where user_id = ${id}`]);
+      if (!t) return bad('Pengguna tidak ditemukan', 404);
+      return J({ user: t, best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])), recent, tstage: en.s });
     }
 
     if (route === 'POST admin/delete-user') {
