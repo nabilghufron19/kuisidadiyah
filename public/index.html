@@ -223,7 +223,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 const $ = s => document.querySelector(s), V = $('#view');
 const LV = { easy: ['Mudah', 10, 100, '🌱', 'e'], medium: ['Sedang', 20, 200, '⚡', 'm'], hard: ['Sulit', 30, 300, '🔥', 'h'] };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let tok = null, me = null;
+let tok = null, me = null, justReg = false;
 try { tok = localStorage.getItem('tk'); } catch (e) {}
 
 async function api(p, b) {
@@ -262,6 +262,7 @@ function vAuth() {
     try {
       const d = await api(mode === 'login' ? 'login' : 'register', { username: $('#u').value.trim(), password: $('#p').value });
       tok = d.token; try { localStorage.setItem('tk', tok); } catch (e) {}
+      if (mode === 'reg') justReg = true;
       await boot();
     } catch (e) { $('#err').textContent = e.message; }
   };
@@ -513,6 +514,19 @@ function openGuide() {
   m.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { m.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x === b)); m.querySelector('#gb').innerHTML = GUIDE[b.dataset.g]; });
   const close = () => m.remove(); m.querySelector('#gx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
 }
+/* Pemberitahuan untuk murid yang baru daftar; setelah ditutup, panduan muncul bila belum pernah dilihat */
+function openWelcome(thenGuide) {
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="box"><h2>Selamat datang, ${esc(me.username)}! 🎉</h2><p class="muted">Akunmu sudah jadi. Ada beberapa hal penting yang perlu kamu ketahui:</p>
+    <ul class="gl"><li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
+    <li><b>Jaga passwordmu.</b> Jangan beritahukan ke siapa pun, termasuk teman. Admin tidak bisa melihat passwordmu; kalau lupa, admin hanya bisa mengaturnya ulang.</li>
+    <li><b>Password bisa diganti</b> kapan saja lewat menu <b>Profil</b>.</li>
+    <li><b>Username bisa diubah nanti.</b> Buka menu <b>Profil</b>, lalu ubah username (3–20 karakter: huruf, angka, atau _). Username tampil di leaderboard, jadi pilih nama yang sopan.</li>
+    <li><b>Masih bingung?</b> Hubungi <b>Nabil Ghufron</b>: <a href="tel:+6285335101970" style="color:var(--accent);font-weight:700">085335101970</a>.</li></ul>
+    <div class="row"><span></span><button class="btn" id="wx">Mengerti</button></div></div>`;
+  document.body.appendChild(m);
+  m.querySelector('#wx').onclick = () => { m.remove(); if (thenGuide) openGuide(); };
+}
 async function vProfile() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   try { Object.assign(me, await api('me')); } catch (e) { V.textContent = e.message; return; }
@@ -757,7 +771,8 @@ function adminUsers() {
 async function boot() {
   try { me = await api('me'); } catch (e) { tok = null; me = null; try { localStorage.removeItem('tk'); } catch (x) {} }
   document.body.classList.toggle('anon', !me);
-  if (me) { renderChip(); $('#navAdmin').hidden = me.role !== 'admin'; go('home'); try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); openGuide(); } } catch (e) {} } else go('auth');
+  if (me) { renderChip(); $('#navAdmin').hidden = me.role !== 'admin'; go('home'); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
+    if (justReg) { justReg = false; openWelcome(g); } else if (g) openGuide(); } else go('auth');
 }
 document.querySelectorAll('.nav[data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
 $('#guideBtn').onclick = () => { closeMenu(); openGuide(); };
