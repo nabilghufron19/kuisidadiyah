@@ -8,6 +8,9 @@ const bad = (m, s = 400) => J({ error: m }, s);
 // Toko: harga efek jawaban benar (gold). 'confetti' bawaan dan gratis. Gold = XP rekor x GOLD_RATE, dikurangi total belanja.
 const GOLD_RATE = 1;
 const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600, fire: 900, ice: 1100, lightning: 1500, comet: 2000, galaxy: 2800 };
+// Kuis harian: 10 soal acak semua jilid; nilai >= DAILY_PASS memberi 1 spin. Hadiah = [gold, bobot]. Spin ke-PITY sejak hadiah >= RARE terakhir dijamin langka.
+const DAILY_N = 10, DAILY_PASS = 80, RARE = 300, PITY = 10;
+const PRIZES = [[100, 49], [150, 24], [200, 12], [300, 8], [500, 4], [750, 2], [1000, 1]]; // hadiah minimal 100 gold
 const PASS_PCT = 60, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT = persen benar agar sebuah quest dianggap selesai
 const keyCache = new Map(); // CryptoKey cukup dibuat sekali per isolate, bukan tiap request
 const hmacKey = s => keyCache.get(s) || (keyCache.set(s, crypto.subtle.importKey('raw', enc.encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])), keyCache.get(s));
@@ -97,14 +100,15 @@ export async function onRequest({ request, env, params }) {
 
     if (route === 'GET me') {
       // satu round trip untuk tiga query
-      const [[usr], best, [t], [sp]] = await sql.transaction([
+      const [[usr], best, [t], [sp], [bn]] = await sql.transaction([
         sql`select username, role, avatar, fx, fxa from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
-        sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`]);
+        sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
+        sql`select coalesce(sum(prize), 0)::int s from daily where user_id = ${uid} and spun`]);
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
-      return J({ username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, spent: sp.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -244,9 +248,9 @@ export async function onRequest({ request, env, params }) {
 
     // ---------- Toko ----------
     const shopState = async () => {
-      const [best, own, [u]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, role from users where id = ${uid}`]);
+      const [best, own, [u], [bn]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, role from users where id = ${uid}`, sql`select coalesce(sum(prize), 0)::int s from daily where user_id = ${uid} and spun`]);
       const earned = best.reduce((a, r) => a + r.xp, 0) * GOLD_RATE, spent = own.reduce((a, r) => a + r.price, 0), admin = !!u && u.role === 'admin';
-      return { gold: earned - spent, earned, spent, admin, owned: admin ? Object.keys(SHOP) : own.map(r => r.item), equipped: u ? u.fxa : null, prices: SHOP };
+      return { gold: earned + bn.s - spent, earned, bonus: bn.s, spent, admin, owned: admin ? Object.keys(SHOP) : own.map(r => r.item), equipped: u ? u.fxa : null, prices: SHOP };
     };
     if (route === 'GET shop') return J(await shopState());
     if (route === 'POST shop/buy') {
@@ -257,7 +261,7 @@ export async function onRequest({ request, env, params }) {
       const [, ins] = await sql.transaction([
         sql`select pg_advisory_xact_lock(${uid}::int)`,
         sql`with best as (select max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts where user_id = ${uid} group by jilid, level),
-            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
+            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce((select sum(prize) from daily where user_id = ${uid} and spun), 0) - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
           insert into purchases (user_id, item, price) select ${uid}::int, ${item}::text, ${price}::int from bal where g >= ${price}::int on conflict do nothing returning item`]);
       if (!ins.length) {
         const [own] = await sql`select 1 from purchases where user_id = ${uid} and item = ${item}`;
@@ -273,6 +277,50 @@ export async function onRequest({ request, env, params }) {
       const fx = item === 'confetti' ? null : item;
       await sql`update users set fxa = ${fx} where id = ${uid}`;
       return J({ ...st, equipped: fx });
+    }
+
+    // ---------- Kuis harian (hari mengikuti WIB) ----------
+    const dailyPity = () => sql`select count(*)::int n from daily where user_id = ${uid} and spun and day > coalesce((select max(day) from daily where user_id = ${uid} and prize >= ${RARE}), date '1970-01-01')`;
+    if (route === 'GET daily') {
+      const [[t], [p], [y]] = await sql.transaction([
+        sql`select done, correct, score, spun, prize from daily where user_id = ${uid} and day = (now() at time zone 'Asia/Jakarta')::date`,
+        sql`select count(*)::int n from daily where user_id = ${uid} and done and score >= ${DAILY_PASS} and not spun`,
+        dailyPity()]);
+      return J({ today: t || null, pending: p.n, pity: y.n, need: PITY, rare: RARE, prizes: PRIZES });
+    }
+    if (route === 'POST daily/start') {
+      const qs = await sql`select id, q, a, b, c, d, answer from questions order by random() limit ${DAILY_N}`;
+      if (qs.length < DAILY_N) return bad('Soal belum cukup untuk kuis harian (minimal ' + DAILY_N + ' soal)');
+      // baris dibuat saat mulai: satu kesempatan per hari, tidak bisa diulang walau halaman ditutup
+      const [r] = await sql`insert into daily (user_id, day) values (${uid}, (now() at time zone 'Asia/Jakarta')::date) on conflict do nothing returning day::text as d`;
+      if (!r) return bad('Kuis harian hari ini sudah kamu ambil. Kembali lagi besok!', 409);
+      const token = await sign({ k: 'daily', uid, day: r.d, ids: qs.map(x => x.id), t0: Date.now(), exp: Date.now() + 36e5 }, S);
+      return J({ questions: qs, token });
+    }
+    if (route === 'POST daily/submit') {
+      const t = await verify(String(body.token || ''), S);
+      if (!t || t.k !== 'daily' || t.uid !== uid) return bad('Sesi kuis harian tidak valid atau kedaluwarsa');
+      const total = t.ids.length;
+      if (Date.now() - t.t0 < total * 1000) return bad('Terlalu cepat. Baca soal dengan teliti.', 429);
+      const an = body.answers && typeof body.answers === 'object' ? body.answers : {};
+      const ids = t.ids.filter(id => /^[ABCD]$/.test(an[id])), ls = ids.map(id => an[id]);
+      const [row] = await sql`with c as (select count(*)::int n from unnest(${ids}::int[], ${ls}::text[]) as a(id, l) join questions q on q.id = a.id and q.answer = a.l)
+        update daily set done = true, correct = c.n, score = round(c.n * 100.0 / ${total}::int)::int from c
+        where user_id = ${uid} and day = ${t.day}::date and not done returning correct, score`;
+      if (!row) return bad('Kuis harian ini sudah diselesaikan', 409);
+      return J({ correct: row.correct, total, score: row.score, pass: row.score >= DAILY_PASS });
+    }
+    if (route === 'POST daily/spin') {
+      const [[row], [y]] = await sql.transaction([
+        sql`select day::text d from daily where user_id = ${uid} and done and score >= ${DAILY_PASS} and not spun order by day desc limit 1`,
+        dailyPity()]);
+      if (!row) return bad('Kamu belum punya kesempatan spin', 409);
+      const pool = y.n + 1 >= PITY ? PRIZES.filter(p => p[0] >= RARE) : PRIZES;
+      let x = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 * pool.reduce((a, p) => a + p[1], 0), prize = pool[pool.length - 1][0];
+      for (const [g, w] of pool) { if ((x -= w) < 0) { prize = g; break; } }
+      const [u] = await sql`update daily set spun = true, prize = ${prize} where user_id = ${uid} and day = ${row.d}::date and done and score >= ${DAILY_PASS} and not spun returning prize`;
+      if (!u) return bad('Spin sudah dipakai', 409);
+      return J({ prize, rare: prize >= RARE, pity: prize >= RARE ? 0 : y.n + 1 });
     }
 
     if (route === 'GET leaderboard') {
