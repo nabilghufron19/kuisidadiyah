@@ -214,6 +214,9 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .si .acts{display:flex;gap:8px}.si .acts .btn{flex:1;padding:10px 6px;font-size:.9rem}
 .si.eq{box-shadow:inset 0 0 0 2px var(--accent)}
 .si.hi{animation:shim 2.4s ease-in-out infinite}
+.si .stage{perspective:420px}.si .stage span{display:inline-block;animation:flip3 5s linear infinite;filter:drop-shadow(0 8px 10px rgba(0,0,0,.35))}
+@keyframes flip3{to{transform:rotateY(360deg)}}
+.lite .si .stage span{animation:none}
 @keyframes shim{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 22px -4px var(--tc)}}
 </style>
 </head>
@@ -319,12 +322,13 @@ function burst(x, y, n = 14) {
   }
 }
 
-/* ---------- Toko: efek jawaban benar ---------- */
+/* ---------- Toko: efek jawaban benar (3D) ---------- */
 const GL = '🪙', R = (a, b) => a + Math.random() * (b - a);
-const N = n => Math.max(4, Math.round(n * (document.documentElement.classList.contains('lite') ? .5 : 1)));
+const LITE = () => document.documentElement.classList.contains('lite');
+const N = n => Math.max(4, Math.round(n * (LITE() ? .5 : 1)));
 const gold = () => Math.max(0, totalXp() * (me.rate || 1) + (me.bonus || 0) - (me.spent || 0));
 const FXL = () => { let z = $('#fxl'); if (!z) { z = document.createElement('div'); z.id = 'fxl'; z.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:98;overflow:hidden'; document.body.appendChild(z); } return z; };
-function part(x, y, o) { // satu partikel, dianimasikan dengan Web Animations API
+function part(x, y, o) { // satu partikel DOM (dipakai kilat layar)
   const p = document.createElement('i');
   p.style.cssText = `position:absolute;left:${x}px;top:${y}px;opacity:0;line-height:1;font-style:normal;will-change:transform,opacity;${o.c || ''}`;
   if (o.t) p.textContent = o.t;
@@ -332,47 +336,198 @@ function part(x, y, o) { // satu partikel, dianimasikan dengan Web Animations AP
   p.animate(o.kf, { duration: o.ms, easing: o.e || 'ease-out', delay: o.d || 0, fill: 'forwards' }).onfinish = () => p.remove();
 }
 const cen = r => [r.left + r.width / 2, r.top + r.height / 2];
-function spray(r, n, o) { // semburan partikel; g > 0 = melambung lalu jatuh
-  const [x, y] = cen(r), T = (a, b, s) => `translate(calc(-50% + ${a}px),calc(-50% + ${b}px)) scale(${s}) rotate(${R(-200, 200)}deg)`;
-  for (let i = 0; i < N(n); i++) {
-    const a = o.ang ? R(o.ang[0], o.ang[1]) : R(0, 6.28), d = R(o.d0, o.d1), dx = Math.cos(a) * d, dy = Math.sin(a) * d, c = typeof o.css === 'function' ? o.css() : (o.css || ''), s0 = { transform: 'translate(-50%,-50%) scale(.4) rotate(0)', opacity: 1 };
-    part(x + (o.sx ? R(-r.width / 2, r.width / 2) : 0), y + (o.sy || 0), { t: o.t && pick(o.t), c: `font-size:${R(o.s0 || 14, o.s1 || 24)}px;${c}`, ms: R(o.m0, o.m1), e: o.e, d: o.dl ? R(0, o.dl) : 0,
-      kf: o.g ? [s0, { transform: T(dx * .65, dy, 1), opacity: 1, offset: .4 }, { transform: T(dx, dy + o.g, .8), opacity: 0 }] : [s0, { transform: T(dx, dy, o.sc || 1), opacity: 0 }] });
-  }
-}
-const glow = (el, c) => el && el.animate([{ boxShadow: `0 0 26px 6px ${c}` }, { boxShadow: '0 0 0 0 transparent' }], { duration: 800, easing: 'ease-out' });
+const glow = (el, c) => el && el.animate([{ boxShadow: `0 0 70px 26px ${c}, 0 0 26px 8px ${c}` }, { boxShadow: '0 0 0 0 transparent' }], { duration: 1100, easing: 'ease-out' });
 const flash = c => part(0, 0, { c: `width:100vw;height:100vh;background:${c};`, kf: [{ opacity: 1 }, { opacity: 0 }], ms: 420 });
-const ring = (x, y, c, k = 7) => part(x, y, { c: `width:20px;height:20px;border-radius:50%;border:3px solid ${c};box-shadow:0 0 14px ${c};`, kf: [{ transform: 'translate(-50%,-50%) scale(.3)', opacity: .9 }, { transform: `translate(-50%,-50%) scale(${k})`, opacity: 0 }], ms: 700 });
+const shake = (px, ms) => { if (!RM) V.animate(Array.from({ length: 9 }, (_, i) => ({ transform: `translate(${R(-px, px) * (1 - i / 9)}px,${R(-px, px) * (1 - i / 9)}px)` })).concat([{ transform: 'none' }]), { duration: ms }); };
+
+/* Mesin 3D: tiap partikel punya posisi (x,y,z) dan rotasi, diproyeksikan dengan perspektif ke satu kanvas layar penuh,
+   lalu digambar dengan cahaya aditif ('lighter') supaya menyala dan menebal. z > 0 = menjauh, z < 0 = mendekat ke layar. */
+const E3 = (() => {
+  const ps = [], F = 640, spr = {}; let cv, cx, W = 0, H = 0, dpr = 1, last = 0, raf = 0;
+  const rgb = c => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`, rs = c => `${c[0] | 0},${c[1] | 0},${c[2] | 0}`, q = v => Math.min(255, Math.round(v / 24) * 24);
+  const fit = () => { dpr = LITE() ? 1 : Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; };
+  const sprite = c => { // bola cahaya: inti putih, tepi memudar
+    const k = q(c[0]) + ',' + q(c[1]) + ',' + q(c[2]);
+    if (!spr[k]) { const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'), r = g.createRadialGradient(48, 48, 0, 48, 48, 48);
+      r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.16, `rgba(${k},.95)`); r.addColorStop(.45, `rgba(${k},.38)`); r.addColorStop(1, `rgba(${k},0)`); g.fillStyle = r; g.fillRect(0, 0, 96, 96); spr[k] = s; }
+    return spr[k];
+  };
+  // kristal es: bipiramida segi enam dengan rotasi 3D dan pencahayaan per sisi
+  const SH = (() => { const v = [[0, -1.7, 0], [0, 1.7, 0]]; for (let i = 0; i < 6; i++) v.push([Math.cos(i * 1.0472) * .55, 0, Math.sin(i * 1.0472) * .55]); const f = []; for (let i = 0; i < 6; i++) { const a = 2 + i, b = 2 + (i + 1) % 6; f.push([0, a, b], [1, b, a]); } return { v, f }; })();
+  const shard = (p, sx, sy, r, c) => {
+    const cX = Math.cos(p.rx), sX = Math.sin(p.rx), cY = Math.cos(p.ry), sY = Math.sin(p.ry), cZ = Math.cos(p.rz), sZ = Math.sin(p.rz);
+    const P = SH.v.map(([x, y, z]) => { let t = y * cX - z * sX; z = y * sX + z * cX; y = t; t = x * cY + z * sY; z = -x * sY + z * cY; x = t; t = x * cZ - y * sZ; y = x * sZ + y * cZ; x = t; return [x, y, z]; });
+    const fs = SH.f.map(f => { const [A, B, C] = f.map(i => P[i]), nx = (B[1] - A[1]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[1] - A[1]), ny = (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]), nz = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]), L = Math.hypot(nx, ny, nz) || 1; return { f, z: (A[2] + B[2] + C[2]) / 3, l: Math.abs(-nx * .4 - ny * .6 - nz * .7) / L }; }).sort((a, b) => b.z - a.z);
+    for (const o of fs) { const k = .3 + .7 * o.l; cx.fillStyle = rgb([c[0] * k + 40 * o.l, c[1] * k + 30 * o.l, Math.min(255, c[2] * k + 50 * o.l)]); cx.strokeStyle = 'rgba(255,255,255,.6)'; cx.lineWidth = 1; cx.beginPath(); o.f.forEach((i, n) => cx[n ? 'lineTo' : 'moveTo'](sx + P[i][0] * r, sy + P[i][1] * r)); cx.closePath(); cx.fill(); cx.stroke(); }
+  };
+  const draw = p => {
+    const u = p.t / p.max, s = Math.min(3.5, F / Math.max(90, F + p.z)), sx = p.ox + p.x * s, sy = p.oy + p.y * s;
+    const a = p.a * Math.min(1, p.ai ? u / p.ai : 1) * Math.pow(Math.max(0, 1 - u), p.ad);
+    if (a < .004) return;
+    let c = p.c;
+    if (p.ramp) { const n = p.ramp.length - 1, f = Math.min(n - .001, u * n), i = f | 0, m = f - i, A = p.ramp[i], B = p.ramp[i + 1]; c = [A[0] + (B[0] - A[0]) * m, A[1] + (B[1] - A[1]) * m, A[2] + (B[2] - A[2]) * m]; }
+    const r = Math.max(.5, p.sz * s * (1 + p.gr * u)), L = 'lighter', O = 'source-over', al = Math.min(1, a);
+    cx.globalAlpha = al; cx.globalCompositeOperation = p.add ? L : O;
+    if (p.halo) { cx.globalCompositeOperation = L; cx.globalAlpha = al * .55; cx.drawImage(sprite(c), sx - r * 2.4, sy - r * 2.4, r * 4.8, r * 4.8); cx.globalCompositeOperation = p.add ? L : O; cx.globalAlpha = al; }
+    switch (p.k) {
+      case 'glow': cx.drawImage(sprite(c), sx - r, sy - r, r * 2, r * 2); break;
+      case 'spark': // goresan cahaya mengikuti arah gerak
+        cx.strokeStyle = rgb(c); cx.lineCap = 'round'; cx.lineWidth = Math.max(1, r * .6); cx.beginPath(); cx.moveTo(sx - p.vx * s * .05, sy - p.vy * s * .05); cx.lineTo(sx, sy); cx.stroke();
+        cx.drawImage(sprite(c), sx - r * 3, sy - r * 3, r * 6, r * 6); break;
+      case 'sphere': {
+        const g = cx.createRadialGradient(sx - r * .35, sy - r * .4, r * .04, sx, sy, r);
+        if (p.glass) { g.addColorStop(0, 'rgba(255,255,255,.85)'); g.addColorStop(.25, `rgba(${rs(c)},.16)`); g.addColorStop(.85, `rgba(${rs(c)},.3)`); g.addColorStop(1, 'rgba(255,255,255,.7)'); }
+        else { g.addColorStop(0, '#fff'); g.addColorStop(.3, rgb(c)); g.addColorStop(1, rgb(c.map(v => v * .25))); }
+        cx.fillStyle = g; cx.beginPath(); cx.arc(sx, sy, r, 0, 7); cx.fill(); break; }
+      case 'coin': { // koin berputar 3D: lebar mengecil saat menyamping, ada tebal sisi
+        const w = Math.max(.14, Math.abs(Math.cos(p.rx))) * r; cx.save(); cx.translate(sx, sy); cx.rotate(p.rz);
+        cx.fillStyle = '#A8730A'; cx.beginPath(); cx.ellipse(r * .1, r * .1, w, r, 0, 0, 7); cx.fill();
+        const g = cx.createLinearGradient(-w, -r, w, r); g.addColorStop(0, '#FFF6B0'); g.addColorStop(.5, '#FFC400'); g.addColorStop(1, '#D18A00'); cx.fillStyle = g; cx.beginPath(); cx.ellipse(0, 0, w, r, 0, 0, 7); cx.fill();
+        cx.strokeStyle = '#FFE98A'; cx.lineWidth = Math.max(1, r * .12); cx.beginPath(); cx.ellipse(0, 0, w * .7, r * .7, 0, 0, 7); cx.stroke(); cx.restore(); break; }
+      case 'petal': {
+        cx.save(); cx.translate(sx, sy); cx.rotate(p.rz); cx.scale(Math.abs(Math.cos(p.rx)) * .8 + .2, 1);
+        const g = cx.createLinearGradient(0, -r, 0, r); g.addColorStop(0, '#fff'); g.addColorStop(.4, rgb(c)); g.addColorStop(1, rgb(c.map(v => v * .8)));
+        cx.fillStyle = g; cx.beginPath(); cx.moveTo(0, -r); cx.bezierCurveTo(r * .9, -r * .5, r * .7, r * .6, 0, r); cx.bezierCurveTo(-r * .7, r * .6, -r * .9, -r * .5, 0, -r); cx.fill(); cx.restore(); break; }
+      case 'star':
+        cx.save(); cx.translate(sx, sy); cx.rotate(p.rz); cx.scale(Math.abs(Math.cos(p.rx)) * .85 + .15, 1);
+        for (const [m, col] of [[1, rgb(c)], [.5, '#fff']]) { cx.fillStyle = col; cx.beginPath(); for (let i = 0; i < 8; i++) { const ra = (i % 2 ? .34 : 1) * r * m, an = i * .7854 - 1.5708; cx.lineTo(Math.cos(an) * ra, Math.sin(an) * ra); } cx.closePath(); cx.fill(); }
+        cx.restore(); break;
+      case 'shard': shard(p, sx, sy, r, c); break;
+      case 'ring': { // gelombang kejut pada bidang miring (tampak 3D)
+        const RR = p.r0 + (p.r1 - p.r0) * (1 - Math.pow(1 - u, 3)), w = p.lw * (1 - u * .7); cx.lineCap = 'round';
+        for (const [m, k] of [[2.6, .3], [1.3, .7], [.5, 1]]) { cx.globalAlpha = al * k; cx.strokeStyle = m < 1 ? '#fff' : rgb(c); cx.lineWidth = Math.max(1, w * m); cx.beginPath(); cx.ellipse(p.ox, p.oy, RR, RR * p.tilt, p.rz, 0, 7); cx.stroke(); }
+        break; }
+      case 'bolt': { // petir: titik 3D diproyeksikan, tebal makin besar saat mendekat; berkedip
+        const fk = u < .16 ? 1 : u < .24 ? .12 : u < .42 ? 1 : 1 - (u - .42) / .58, pts = p.pts.map(([x, y, z]) => { const k = Math.min(3.5, F / Math.max(90, F + z)); return [p.ox + x * k, p.oy + y * k]; });
+        cx.lineJoin = cx.lineCap = 'round';
+        for (const [w, k] of [[22, .16], [11, .34], [5, .75], [2.2, 1]]) { cx.globalAlpha = Math.min(1, fk * k); cx.strokeStyle = w < 3 ? '#fff' : rgb(c); cx.lineWidth = w * p.w; cx.beginPath(); pts.forEach((t, i) => cx[i ? 'lineTo' : 'moveTo'](t[0], t[1])); cx.stroke(); }
+        break; }
+      case 'flash': cx.fillStyle = rgb(c); cx.fillRect(0, 0, W, H); break;
+    }
+  };
+  const frame = dt => {
+    for (let i = ps.length - 1; i >= 0; i--) {
+      const p = ps[i]; p.t += dt; if (p.tick) p.tick(p, dt);
+      const d = Math.pow(p.dr, dt); p.vx *= d; p.vy *= d; p.vz *= d; p.vy += p.g * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.rx += p.wx * dt; p.ry += p.wy * dt; p.rz += p.wz * dt;
+      if (p.t >= p.max) { ps.splice(i, 1); if (p.end) p.end(p); }
+    }
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, W, H);
+    ps.sort((a, b) => b.z - a.z); for (const p of ps) draw(p);
+    cx.globalAlpha = 1; cx.globalCompositeOperation = 'source-over';
+  };
+  const loop = now => { frame(Math.min(.033, (now - last) / 1000)); last = now; raf = ps.length ? requestAnimationFrame(loop) : 0; };
+  const add = p => {
+    if (!cv) { cv = document.createElement('canvas'); cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:98'; document.body.appendChild(cv); cx = cv.getContext('2d'); fit(); addEventListener('resize', fit); }
+    ps.push(Object.assign({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, g: 0, dr: 1, t: 0, max: 1, sz: 10, c: [255, 255, 255], k: 'glow', a: 1, ad: 1, ai: 0, add: 1, gr: 0, rx: 0, ry: 0, rz: 0, wx: 0, wy: 0, wz: 0, w: 1, glass: 0, halo: 0 }, p));
+    if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
+  };
+  return { add, step: frame, get n() { return ps.length; } };
+})();
+const dir = () => { const u = R(-1, 1), t = R(0, 6.283), r = Math.sqrt(1 - u * u); return [r * Math.cos(t), u, r * Math.sin(t)]; }; // arah acak pada bola
+const flash3 = (c, a, s) => E3.add({ ox: 0, oy: 0, k: 'flash', c, a, max: s, z: -9999, ad: 1.6 });
+const sparks = (ox, oy, n, c, v0, v1, o = {}) => { for (let i = 0; i < N(n); i++) { const [a, b, d] = dir(), v = R(v0, v1); E3.add(Object.assign({ ox, oy, k: 'spark', sz: R(1.6, 3.4), vx: a * v, vy: b * v, vz: d * v, dr: .22, max: R(.6, 1.2), c: Array.isArray(c[0]) ? pick(c) : c }, o)); } };
+
 const FX = {
   confetti: r => burst(...cen(r), 18),
-  stars: r => spray(r, 16, { t: ['✨', '⭐', '✦'], css: 'color:#F5C518;text-shadow:0 0 8px #F5C518;', d0: 50, d1: 150, m0: 700, m1: 1100, sc: 1.2 }),
-  bubbles: r => spray(r, 14, { sx: 1, ang: [-2.3, -.85], d0: 70, d1: 170, m0: 900, m1: 1500, e: 'ease-in-out', sc: 1.1, css: () => { const s = R(10, 26); return `width:${s}px;height:${s}px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff 0 12%,rgba(120,200,255,.3) 45%,rgba(120,200,255,.1));border:1.5px solid rgba(150,210,255,.85);`; } }),
-  petals: r => spray(r, 16, { t: ['🌸', '💮'], sx: 1, sy: -10, d0: 40, d1: 110, g: 100, m0: 1200, m1: 1900, e: 'ease-in-out', s0: 16, s1: 26 }),
-  coins: r => spray(r, 14, { t: [GL], ang: [-2.5, -.65], d0: 70, d1: 150, g: 170, m0: 1000, m1: 1500, e: 'cubic-bezier(.3,.6,.55,1)', s0: 20, s1: 30 }),
-  fireworks: r => { const [x, y] = cen(r); [[-90, -120, '#FF5C5C'], [70, -170, '#5CC8FF'], [0, -90, '#FFD84D']].forEach(([dx, dy, c], k) => setTimeout(() => spray({ left: x + dx, top: y + dy, width: 0, height: 0 }, 22, { d0: 50, d1: 110, m0: 800, m1: 1200, g: 50, css: `width:7px;height:7px;border-radius:50%;background:${c};box-shadow:0 0 8px ${c};` }), k * 200)); },
-  fire: (r, el) => { glow(el, 'rgba(255,106,0,.9)'); spray(r, 18, { t: ['🔥'], sx: 1, sy: r.height / 2, ang: [-2, -1.15], d0: 60, d1: 130, m0: 700, m1: 1100, s0: 18, s1: 32, sc: 1.5, css: 'filter:drop-shadow(0 0 6px #ff6a00);' }); },
-  ice: (r, el) => { const [x, y] = cen(r); glow(el, 'rgba(124,211,255,.95)'); ring(x, y, '#9be3ff'); spray(r, 18, { t: ['❄️', '❅', '❆'], css: 'color:#cdeeff;text-shadow:0 0 8px #7CD3FF;', d0: 60, d1: 150, g: 70, m0: 1000, m1: 1500, s0: 16, s1: 28 }); },
+  stars: (r, el) => {
+    const [ox, oy] = cen(r), CL = [[255, 214, 90], [255, 240, 160], [255, 180, 60]];
+    E3.add({ ox, oy, sz: 150, max: .5, c: [255, 210, 90], ad: 1.5 });
+    for (let i = 0; i < N(28); i++) { const [a, b, d] = dir(), v = R(300, 600); E3.add({ ox, oy, k: 'star', halo: 1, sz: R(11, 24), vx: a * v, vy: b * v - 60, vz: d * v, dr: .22, g: 140, max: R(1.1, 1.8), c: pick(CL), wx: R(-8, 8), wz: R(-5, 5), ad: .8 }); }
+    sparks(ox, oy, 40, [255, 235, 150], 140, 420);
+    glow(el, 'rgba(255,200,60,.95)');
+  },
+  bubbles: (r, el) => {
+    const [ox, oy] = cen(r);
+    E3.add({ ox, oy, sz: 170, max: .7, c: [110, 190, 255], ad: 1.5 });
+    for (let i = 0; i < N(26); i++) E3.add({ ox: ox + R(-r.width / 2, r.width / 2), oy: oy + R(-8, 12), z: R(-120, 200), k: 'sphere', glass: 1, add: 0, sz: R(13, 36), vy: R(-280, -120), vx: R(-40, 40), vz: R(-60, 60), dr: .55, g: -30, max: R(1.3, 2.1), c: [150, 215, 255], ad: .6, ai: .08, tick: p => { p.vx += Math.sin(p.t * 5 + p.sz) * 3; } });
+    glow(el, 'rgba(120,200,255,.95)');
+  },
+  petals: (r, el) => {
+    const [ox, oy] = cen(r), CL = [[255, 170, 200], [255, 205, 225], [255, 140, 175], [255, 235, 240]];
+    E3.add({ ox, oy, sz: 170, max: .7, c: [255, 150, 190], ad: 1.5 });
+    for (let i = 0; i < N(36); i++) { const a = R(-2.6, -.55), v = R(280, 600); E3.add({ ox: ox + R(-r.width / 3, r.width / 3), oy, z: R(-80, 160), k: 'petal', halo: 1, add: 0, sz: R(12, 24), vx: Math.cos(a) * v * .8, vy: Math.sin(a) * v, vz: R(-120, 120), dr: .35, g: 240, max: R(1.7, 2.5), c: pick(CL), wx: R(-7, 7), wz: R(-4, 4), ad: .7, tick: p => { p.vx += Math.sin(p.t * 4 + p.sz) * 14; } }); }
+    glow(el, 'rgba(255,150,190,.95)');
+  },
+  coins: (r, el) => {
+    const [ox, oy] = cen(r);
+    E3.add({ ox, oy, sz: 190, max: .6, c: [255, 200, 40], ad: 1.4 });
+    for (let i = 0; i < N(22); i++) { const a = R(-2.4, -.75), v = R(560, 940); E3.add({ ox, oy, z: R(-60, 120), k: 'coin', halo: 1, add: 0, sz: R(16, 28), vx: Math.cos(a) * v * .6, vy: Math.sin(a) * v, vz: R(-120, 120), dr: .75, g: 1150, max: R(1.5, 2.1), c: [255, 200, 40], wx: R(6, 14), wz: R(-2, 2), ad: .5, tick: p => { if (Math.random() < .1) E3.add({ ox: p.ox, oy: p.oy, x: p.x, y: p.y, z: p.z, k: 'spark', sz: 2, max: .4, c: [255, 240, 150], vx: R(-60, 60), vy: R(-60, 60) }); } }); }
+    glow(el, 'rgba(255,196,40,.95)');
+  },
+  fireworks: (r, el) => {
+    const [ox, oy] = cen(r), CL = [[255, 80, 80], [80, 200, 255], [255, 220, 70], [190, 110, 255], [90, 255, 150]];
+    glow(el, 'rgba(255,200,90,.9)');
+    [[-110, -150], [95, -215], [0, -120], [-45, -265]].forEach(([dx, dy], k) => setTimeout(() => {
+      const c = pick(CL), c2 = pick(CL);
+      const boom = (x, y, z) => {
+        E3.add({ ox, oy, x, y, z, sz: 230, max: .55, c, ad: 1.6 });
+        for (let i = 0; i < N(90); i++) { const [a, b, d] = dir(), v = R(170, 400); E3.add({ ox, oy, x, y, z, k: 'spark', sz: R(2, 4.2), vx: a * v, vy: b * v, vz: d * v, dr: .25, g: 250, max: R(.9, 1.6), c: i % 3 ? c : c2, ad: .9 }); }
+      };
+      E3.add({ ox, oy, k: 'spark', sz: 3, vx: dx * 3.5, vy: dy * 3.5, max: .28, c: [255, 230, 160], ad: 0, end: p => boom(p.x, p.y, p.z) });
+    }, k * 210));
+  },
+  fire: (r, el) => {
+    const [ox, oy] = cen(r), RAMP = [[255, 250, 200], [255, 190, 50], [255, 90, 10], [150, 20, 0]];
+    E3.add({ ox, oy, sz: 280, max: 1.2, c: [255, 110, 20], ad: 1.2 });
+    glow(el, 'rgba(255,110,10,.98)'); shake(5, 450);
+    let n = 0; const iv = setInterval(() => {
+      for (let i = 0; i < N(12); i++) E3.add({ ox: ox + R(-r.width / 2, r.width / 2), oy: oy + r.height / 2 - 6, z: R(-80, 120), ramp: RAMP, sz: R(28, 58), gr: .5, vy: R(-340, -170), vx: R(-40, 40), dr: .6, max: R(.55, 1), ad: 1.1, tick: p => { p.vx += Math.sin(p.t * 9 + p.sz) * 24; } });
+      for (let i = 0; i < N(3); i++) E3.add({ ox: ox + R(-r.width / 2, r.width / 2), oy: oy + r.height / 2, k: 'spark', sz: 2.2, c: [255, 170, 60], vy: R(-440, -230), vx: R(-90, 90), g: -40, dr: .5, max: R(.8, 1.4) });
+      if (++n > 16) clearInterval(iv);
+    }, 45);
+  },
+  ice: (r, el) => {
+    const [ox, oy] = cen(r), BL = [[130, 215, 255], [200, 240, 255], [90, 170, 255]];
+    E3.add({ ox, oy, sz: 240, max: .8, c: [120, 210, 255], ad: 1.4 });
+    E3.add({ ox, oy: oy + 16, k: 'ring', r0: 10, r1: 200, tilt: .34, lw: 13, c: [150, 225, 255], max: .9 });
+    E3.add({ ox, oy: oy + 16, k: 'ring', r0: 5, r1: 125, tilt: .34, lw: 7, c: [230, 250, 255], max: .7 });
+    for (let i = 0; i < N(18); i++) { const [a, b, d] = dir(), v = R(240, 520); E3.add({ ox, oy, k: 'shard', halo: 1, add: 0, sz: R(12, 24), vx: a * v, vy: b * v - 80, vz: d * v, dr: .2, g: 170, max: R(1.2, 1.9), c: pick(BL), wx: R(-6, 6), wy: R(-6, 6), wz: R(-6, 6), ad: .8 }); }
+    sparks(ox, oy, 50, [[220, 245, 255], [150, 220, 255]], 100, 340, { g: 90, max: R(.8, 1.5) });
+    flash3([120, 200, 255], .14, .4); glow(el, 'rgba(120,210,255,.98)');
+  },
   lightning: (r, el) => {
-    const [x, y] = cen(r), svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;opacity:0'); svg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
-    const bolt = sx => { let d = `M${sx} 0`; for (let i = 1; i <= 9; i++) d += ` L${sx + (x - sx) * i / 9 + (i < 9 ? R(-28, 28) : 0)} ${y * i / 9}`; return d; };
-    svg.innerHTML = [x + R(-160, -60), x + R(-30, 30), x + R(60, 160)].map(sx => `<path d="${bolt(sx)}" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px #7DB7FF) drop-shadow(0 0 14px #5B8CFF)"/>`).join('');
-    FXL().appendChild(svg);
-    svg.animate([{ opacity: 0 }, { opacity: 1 }, { opacity: .2 }, { opacity: 1 }, { opacity: .1 }, { opacity: .8 }, { opacity: 0 }], { duration: 650 }).onfinish = () => svg.remove();
-    flash('rgba(160,190,255,.35)'); glow(el, 'rgba(120,170,255,.95)');
-    spray(r, 12, { t: ['⚡'], css: 'color:#FFE55C;text-shadow:0 0 10px #7DB7FF;', d0: 40, d1: 120, m0: 500, m1: 800 });
+    const [ox, oy] = cen(r), B = [80, 140, 255];
+    const mk = (x0, y0, z0, x1, y1, z1, n, jit) => Array.from({ length: n + 1 }, (_, i) => { const t = i / n, e = i && i < n ? 1 : 0; return [x0 + (x1 - x0) * t + e * R(-jit, jit), y0 + (y1 - y0) * t + e * R(-jit * .4, jit * .4), z0 + (z1 - z0) * t]; });
+    const strike = (delay, pw) => setTimeout(() => {
+      for (let k = 0; k < 3; k++) {
+        const main = mk(R(-170, 170) * (k ? 1 : .35), -(oy + 60), 520, R(-12, 12), 0, -20, 14, 46);
+        E3.add({ ox, oy, k: 'bolt', pts: main, c: B, max: .55, ad: 0 });
+        for (let b = 0; b < 2; b++) { const m = main[3 + (R(0, 8) | 0)]; E3.add({ ox, oy, k: 'bolt', pts: mk(m[0], m[1], m[2], m[0] + R(-150, 150), m[1] + R(60, 190), m[2] - 60, 6, 26), c: B, max: .45, ad: 0, w: .6 }); }
+      }
+      flash3([150, 180, 255], .5 * pw, .35);
+      E3.add({ ox, oy: oy + 12, k: 'ring', r0: 10, r1: 170 * pw, tilt: .32, lw: 11, c: [140, 190, 255], max: .65 });
+      E3.add({ ox, oy, sz: 280 * pw, max: .55, c: [140, 180, 255], ad: 1.4 });
+      sparks(ox, oy, 36, [[255, 240, 150], [200, 225, 255], [255, 255, 255]], 180, 560, { g: 520, max: R(.4, .9) });
+      glow(el, 'rgba(130,170,255,.99)'); shake(9 * pw, 400);
+    }, delay);
+    strike(0, 1); strike(190, .75);
   },
   comet: (r, el) => {
-    const [x, y] = cen(r), dx = 380, dy = 420, ang = Math.atan2(dy, dx) * 57.3;
-    part(x - dx, y - dy, { c: 'width:140px;height:7px;margin:-3px 0 0 -140px;border-radius:9px;transform-origin:100% 50%;background:linear-gradient(90deg,transparent,#ff9a3c 70%,#fff);box-shadow:0 0 16px 4px #ff9a3c;', kf: [{ transform: `translate(0,0) rotate(${ang}deg)`, opacity: 1 }, { transform: `translate(${dx}px,${dy}px) rotate(${ang}deg)`, opacity: 1 }], ms: 420, e: 'ease-in' });
-    setTimeout(() => { ring(x, y, '#ffb347', 8); flash('rgba(255,170,70,.28)'); glow(el, 'rgba(255,150,60,.95)'); spray(r, 20, { t: ['🔥', '✨', '💥'], d0: 60, d1: 160, g: 50, m0: 700, m1: 1100, s0: 16, s1: 30 }); }, 400);
+    const [ox, oy] = cen(r), FL = [[255, 255, 230], [255, 200, 90], [255, 110, 20], [120, 30, 0]], T = .55;
+    const impact = () => {
+      flash3([255, 190, 90], .55, .4); shake(13, 560); glow(el, 'rgba(255,150,50,.99)');
+      E3.add({ ox, oy, sz: 400, max: .75, c: [255, 150, 40], ad: 1.3, gr: .6 });
+      E3.add({ ox, oy, sz: 170, max: .38, c: [255, 255, 230], ad: 1.5 });
+      [[8, 240, 15, .75], [4, 155, 8, .55]].forEach(([r0, r1, lw, mx]) => E3.add({ ox, oy: oy + 14, k: 'ring', r0, r1, tilt: .34, lw, c: [255, 170, 70], max: mx }));
+      for (let i = 0; i < N(28); i++) { const [a, b, d] = dir(), v = R(240, 660); E3.add({ ox, oy, k: 'sphere', halo: 1, sz: R(5, 13), vx: a * v, vy: b * v - 120, vz: d * v, dr: .3, g: 540, max: R(.8, 1.5), c: [255, 140, 40], ad: .8 }); }
+      sparks(ox, oy, 60, [[255, 230, 150], [255, 160, 60]], 200, 700, { g: 300 });
+    };
+    E3.add({ ox, oy, x: -460, y: -520, z: 560, vx: 460 / T, vy: 520 / T, vz: -680 / T, k: 'sphere', halo: 1, sz: 30, c: [255, 190, 90], max: T, ad: 0, end: impact,
+      tick: p => { for (let i = 0; i < 3; i++) E3.add({ ox, oy, x: p.x + R(-8, 8), y: p.y + R(-8, 8), z: p.z, ramp: FL, sz: R(26, 48), gr: -.4, vx: R(-40, 40), vy: R(-40, 40), max: R(.35, .6), ad: 1.2 }); } });
   },
   galaxy: (r, el) => {
-    const [x, y] = cen(r);
-    for (let k = 0; k < 3; k++) part(x, y, { c: 'width:60px;height:60px;border-radius:50%;border:3px solid transparent;border-top-color:#C77DFF;border-bottom-color:#5EE7FF;box-shadow:0 0 18px #9D4EDD;', d: k * 90, ms: 900 + k * 150,
-      kf: [{ transform: 'translate(-50%,-50%) scale(.2) rotate(0)', opacity: 1 }, { transform: `translate(-50%,-50%) scale(${3 + k * 1.6}) rotate(${k % 2 ? -540 : 540}deg)`, opacity: 0 }] });
-    flash('rgba(157,78,221,.18)'); glow(el, 'rgba(157,78,221,.9)');
-    spray(r, 24, { t: ['✦', '✧', '⭐', '🌙'], css: 'color:#E0AAFF;text-shadow:0 0 10px #9D4EDD;', d0: 60, d1: 180, m0: 900, m1: 1400, sc: 1.3 });
+    const [ox, oy] = cen(r), CL = [[190, 110, 255], [90, 220, 255], [255, 130, 220], [255, 255, 255], [140, 120, 255]];
+    flash3([157, 78, 221], .3, .5); glow(el, 'rgba(170,90,255,.98)'); shake(5, 450);
+    E3.add({ ox, oy, sz: 320, max: 1.4, c: [150, 70, 230], ad: 1.1 });
+    E3.add({ ox, oy, sz: 130, max: 1.1, c: [255, 255, 255], ad: 1.4 });
+    [[240, 12, [199, 125, 255]], [185, 9, [94, 231, 255]], [140, 7, [255, 130, 220]]].forEach(([r1, lw, c], k) => E3.add({ ox, oy, k: 'ring', r0: 6, r1, tilt: .42, rz: k * .6, lw, c, max: 1.1 + k * .15 }));
+    const M = N(44);
+    for (let a = 0; a < 3; a++) for (let i = 0; i < M; i++) { // lengan spiral: bintang mengorbit pada bidang miring
+      const rr = R(20, 210), th0 = a * 2.094 + rr * .018 + R(-.25, .25), om = 3.2 - rr * .008;
+      E3.add({ ox, oy, sz: R(5, 13), c: pick(CL), max: R(1.1, 1.8), ad: .9, ai: .08, tick: p => { const th = th0 + om * p.t, RR = rr * (1 + p.t * .5); p.x = Math.cos(th) * RR; p.y = Math.sin(th) * RR * .45; p.z = Math.sin(th) * RR * .6; } });
+    }
+    for (let i = 0; i < N(10); i++) E3.add({ ox, oy, k: 'star', halo: 1, sz: R(9, 18), c: pick(CL), max: R(1, 1.6), wx: R(-5, 5), wz: R(-3, 3), x: R(-150, 150), y: R(-70, 70), z: R(-100, 200), ad: .9, ai: .1 });
   },
 };
 function ansFx(el) { if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
@@ -403,7 +558,7 @@ async function vShop() {
       <p class="muted">Gold didapat dari tiap level, sama seperti XP: setiap rekor baru menambah XP dan Gold sebanyak yang sama. Belanjakan untuk efek yang muncul saat jawabanmu benar. Membeli tidak mengurangi XP atau rankmu.${st.admin ? ' Sebagai admin, semua efek terbuka untukmu.' : ''}</p>
       <div class="shopg">${SHOP.map(([k, nm, ic, tr, ds]) => {
         const own = k === 'confetti' || st.owned.includes(k), eq = (st.equipped || 'confetti') === k, pr = st.prices[k] || 0;
-        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span><div class="stage" id="sg-${k}">${ic}</div><h3>${nm}</h3><p>${ds}</p>
+        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span><div class="stage" id="sg-${k}"><span>${ic}</span></div><h3>${nm}</h3><p>${ds}</p>
           <div class="acts"><button class="btn ghost" data-try="${k}">Coba</button>${own
             ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? 'Terpasang ✓' : 'Pasang'}</button>`
             : `<button class="btn" data-buy="${k}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : GL + ' ' + pr}</button>`}</div></div>`;
