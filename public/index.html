@@ -196,6 +196,13 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .pz,.pz *,.pz *::before,.pz *::after{animation-play-state:paused!important}
 .lite .avw.t2,.lite .avw.t3,.lite .avw.t4,.lite .fire{animation:none!important;box-shadow:0 0 calc(var(--t,4px)*3) 0 var(--c1,#ff6a00)}
 .lite .fl{animation:none}
+/* ===== Spin hadiah ===== */
+.reel{position:relative;overflow:hidden;border-radius:18px;background:var(--bg);border:1px solid var(--line);margin:14px 0;padding:12px 0}
+.strip{display:flex;gap:8px;width:max-content;will-change:transform}
+.pt{flex:0 0 96px;height:84px;border-radius:14px;display:grid;place-items:center;font-weight:800;font-size:1.1rem;color:#fff;background:var(--pc);box-shadow:inset 0 -6px 0 rgba(0,0,0,.18)}
+.pt.win{animation:winp .6s ease-out infinite alternate;z-index:1}
+.ptr{position:absolute;left:50%;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;box-shadow:0 0 10px 2px var(--accent)}
+@keyframes winp{to{transform:scale(1.14);filter:brightness(1.25)}}
 /* ===== Toko ===== */
 .gold{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#FFE27A,#F2B705);color:#3a2e00;font-weight:800;padding:2px 14px;border-radius:999px}
 .shopbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -216,7 +223,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
   <aside class="side">
     <div class="brand"><img src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></div>
     <button class="nav" data-v="home">Beranda</button>
-    <button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button>
+    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button>
     <button class="nav" data-v="admin" id="navAdmin" hidden>Panel Admin</button>
     <div class="sp"></div>
     <button class="nav" data-v="profile" id="who"></button>
@@ -253,7 +260,7 @@ const closeMenu = () => $('#app').classList.remove('open');
 function go(v, a) {
   closeMenu(); if (me) renderChip();
   document.querySelectorAll('.nav[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
-  ({ auth: vAuth, home: vHome, board: vBoard, shop: vShop, admin: vAdmin, profile: vProfile })[v](a);
+  ({ auth: vAuth, home: vHome, board: vBoard, daily: vDaily, shop: vShop, admin: vAdmin, profile: vProfile })[v](a);
   $('.scroll').scrollTop = 0;
 }
 
@@ -315,7 +322,7 @@ function burst(x, y, n = 14) {
 /* ---------- Toko: efek jawaban benar ---------- */
 const GL = '🪙', R = (a, b) => a + Math.random() * (b - a);
 const N = n => Math.max(4, Math.round(n * (document.documentElement.classList.contains('lite') ? .5 : 1)));
-const gold = () => Math.max(0, totalXp() * (me.rate || 1) - (me.spent || 0));
+const gold = () => Math.max(0, totalXp() * (me.rate || 1) + (me.bonus || 0) - (me.spent || 0));
 const FXL = () => { let z = $('#fxl'); if (!z) { z = document.createElement('div'); z.id = 'fxl'; z.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:98;overflow:hidden'; document.body.appendChild(z); } return z; };
 function part(x, y, o) { // satu partikel, dianimasikan dengan Web Animations API
   const p = document.createElement('i');
@@ -388,7 +395,7 @@ const TIER = { Umum: '#8A97A6', Langka: '#2BA3E6', Epik: '#A94BC0', Legendaris: 
 async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
-  const sync = () => { me.spent = st.spent; me.fxa = st.equipped; };
+  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; };
   const play = k => { const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
   const draw = () => {
     sync(); const g = st.gold;
@@ -412,6 +419,89 @@ async function vShop() {
     });
   };
   draw();
+}
+
+/* ---------- Kuis harian + spin hadiah ---------- */
+const DAILY_PASS = 80, PRIZE_C = { 100: '#8A97A6', 150: '#4CAF73', 200: '#2BA3E6', 300: '#A94BC0', 500: '#E8960F', 750: '#EF3E7B', 1000: '#F5C518' };
+async function vDaily() {
+  V.innerHTML = '<p class="muted">Memuat…</p>';
+  let d; try { d = await api('daily'); } catch (e) { V.textContent = e.message; return; }
+  const t = d.today, tot = d.prizes.reduce((a, p) => a + p[1], 0), WIN = 36;
+  const ms = 864e5 - ((Date.now() + 252e5) % 864e5), left = Math.floor(ms / 36e5) + ' jam ' + Math.floor(ms % 36e5 / 6e4) + ' menit'; // hari baru = pukul 00.00 WIB
+  const tile = g => `<div class="pt" style="--pc:${PRIZE_C[g]}">${GL} ${g}</div>`;
+  const status = !t ? `<p>10 soal acak dari semua jilid. Nilai minimal <b>${DAILY_PASS}</b> untuk mendapat <b>1× spin hadiah</b>, hadiah tertinggi <b>${GL} 1000</b>! Hanya satu kesempatan per hari dan tidak bisa diulang.</p><button class="btn" id="dgo">Mulai kuis harian</button>`
+    : !t.done ? '<p>Kuis hari ini sudah dimulai tapi tidak diselesaikan, jadi kesempatan hari ini hangus. Coba lagi besok.</p>'
+    : t.score >= DAILY_PASS ? `<p>Hasil hari ini: <b>${t.correct}/10</b> benar (nilai ${t.score}). ${t.spun ? 'Hadiah spinmu: ' + GL + ' ' + t.prize + ' 🎉' : 'Spin hadiahmu menunggu di atas!'}</p>`
+    : `<p>Hasil hari ini: <b>${t.correct}/10</b> benar (nilai ${t.score}). Belum mencapai ${DAILY_PASS}, coba lagi besok.</p>`;
+  V.innerHTML = '<h1>Kuis Harian</h1>' +
+    (d.pending ? `<div class="card spin"><span class="tag">🎰 Spin hadiah</span><h2>Kamu punya ${d.pending} spin!</h2><div class="reel"><div class="strip" id="strip"></div><i class="ptr"></i></div><div id="spmsg"></div><div class="row"><span></span><button class="btn" id="spin">Putar!</button></div></div>` : '') +
+    `<div class="card"><span class="tag">🎯 Hari ini</span>${status}<p class="muted" style="margin:8px 0 0">Kuis diperbarui dalam ${left} (pukul 00.00 WIB).</p></div>
+    <div class="card"><h2>Hadiah spin</h2>${d.prizes.map(([g, w]) => `<div class="urow"><span class="pt" style="--pc:${PRIZE_C[g]};flex:0 0 auto;height:34px;padding:0 14px;font-size:.95rem">${GL} ${g}</span><span class="muted" style="margin:0">peluang ${+(w / tot * 100).toFixed(1)}%</span></div>`).join('')}
+    <p class="muted" style="margin:8px 0 0">Jaminan: spin ke-${d.need} sejak hadiah langka terakhir pasti mendapat ${GL} ${d.rare} atau lebih. Spin berikutnya adalah yang ke-${d.pity + 1}.</p></div>`;
+  const go1 = $('#dgo'); if (go1) go1.onclick = async () => {
+    if (!confirm('Kamu hanya punya satu kesempatan hari ini dan tidak bisa mengulang. Jangan tutup halaman sebelum selesai. Mulai sekarang?')) return;
+    try { vDailyQuiz(await api('daily/start', {})); } catch (e) { alert(e.message); }
+  };
+  const strip = $('#strip'); if (!strip) return;
+  const mk = () => { const x = Math.random() * tot; let a = 0; for (const [g, w] of d.prizes) { a += w; if (x < a) return g; } return d.prizes[0][0]; };
+  strip.innerHTML = Array.from({ length: 44 }, () => tile(mk())).join('');
+  const reveal = r => {
+    const w = strip.children[WIN]; w.classList.add('win'); me.bonus = (me.bonus || 0) + r.prize;
+    $('#spmsg').innerHTML = `<div class="fb ok" style="font-size:1.1rem">${r.prize >= 1000 ? '🎰 JACKPOT! ' : ''}Kamu mendapat ${GL} ${r.prize}!</div>`;
+    const rc = w.getBoundingClientRect();
+    if (r.prize >= 1000) { FX.fireworks(rc); setTimeout(() => FX.galaxy(rc, w), 300); flash('rgba(245,197,24,.3)'); }
+    else if (r.prize >= 500) FX.fireworks(rc); else if (r.prize >= d.rare) FX.stars(rc); else burst(...cen(rc), 18);
+    $('.spin .row').innerHTML = `<button class="btn ghost" id="shp">Ke Toko</button><button class="btn" id="spn">${d.pending > 1 ? 'Lanjut' : 'Selesai'}</button>`;
+    $('#shp').onclick = () => go('shop'); $('#spn').onclick = () => vDaily();
+  };
+  $('#spin').onclick = async () => {
+    const btn = $('#spin'); btn.disabled = true;
+    let r; try { r = await api('daily/spin', {}); } catch (e) { alert(e.message); btn.disabled = false; return; }
+    strip.children[WIN].outerHTML = tile(r.prize);
+    const W = strip.parentElement.clientWidth, x = W / 2 - (WIN * 104 + 48) + R(-34, 34);
+    strip.style.transition = RM ? 'none' : 'transform 5.2s cubic-bezier(.1,.75,.12,1)';
+    requestAnimationFrame(() => requestAnimationFrame(() => { strip.style.transform = `translateX(${x}px)`; }));
+    setTimeout(() => reveal(r), RM ? 50 : 5400);
+  };
+}
+function vDailyQuiz(d) {
+  const qs = d.questions, wrong = [], ans = {}; let i = 0, fin = false;
+  // bila halaman ditutup di tengah kuis, jawaban yang sudah ada tetap dikirim (sisanya dihitung salah)
+  const hide = () => { if (!fin) fetch('/api/daily/submit', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ token: d.token, answers: ans }) }).catch(() => {}); };
+  addEventListener('pagehide', hide);
+  const draw = () => {
+    const q = qs[i];
+    V.innerHTML = `<div class="card"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
+      <div class="meta"><span class="muted">🎯 Kuis Harian · Soal ${i + 1}/${qs.length}</span></div>
+      <h2 dir="auto" id="qt"></h2><div>` +
+      ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
+      `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
+    const h = $('#qt'), all = V.querySelectorAll('.opt');
+    typeIt(h, q.q);
+    h.onclick = () => { clearInterval(tt); h.textContent = q.q; h.classList.remove('cur'); };
+    all.forEach(b => b.onclick = () => {
+      all.forEach(x => x.disabled = true);
+      const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
+      clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
+      [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
+      if (ok) ansFx(b); else { b.classList.add('no'); wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
+      $('#nx').hidden = false; $('#nx').focus();
+    });
+    $('#nx').onclick = async () => {
+      if (i < qs.length - 1) { i++; draw(); return; }
+      try { const r = await api('daily/submit', { token: d.token, answers: ans }); fin = true; removeEventListener('pagehide', hide); vDailyResult(r, wrong); } catch (e) { alert(e.message); }
+    };
+  };
+  draw();
+}
+function vDailyResult(r, wrong) {
+  V.innerHTML = `<div class="card res"><div class="big">${r.pass ? '🎉' : '💪'}</div><span class="tag">Hasil Kuis Harian</span><h1>${r.correct} / ${r.total}</h1>
+    <p class="muted">Nilai ${r.score}. ${r.pass ? 'Kamu berhak 1× spin hadiah!' : 'Butuh minimal ' + DAILY_PASS + ' untuk spin. Coba lagi besok.'}</p>
+    <div class="row"><span></span><button class="btn" id="dn">${r.pass ? '🎰 Spin hadiah' : 'Kembali'}</button></div></div>` +
+    (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
+  if (r.pass) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
+  $('#dn').onclick = () => go(r.pass ? 'daily' : 'home');
 }
 
 /* ---------- Beranda ---------- */
@@ -438,6 +528,7 @@ function vHome() {
   V.innerHTML = `<h1>Assalamu'alaikum, ${esc(me.username)}</h1>
     <div class="card"><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span><span class="gold" style="margin:0 0 10px 8px">${GL} ${gold()}</span><h1><span id="tx">0</span> XP</h1><div class="prog"><i id="pg"></i></div>
     <p class="muted" style="margin:8px 0 0">${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</p></div>
+    <div class="card endless" style="--i:2"><div><span class="tag">🎯 Kuis Harian</span><h2>10 soal acak · spin hadiah sampai ${GL} 1000</h2><small>Nilai minimal 80. Satu kesempatan per hari.</small></div><button class="btn" id="dailyGo">Buka</button></div>
     <div class="card" style="--i:2"><h2>Tingkatan rank</h2><div class="ranks">${RANKS.map((r, n) => `<div class="rnk ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${n <= ri ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div></div>
     <div class="card endless" style="--i:3"><div><span class="tag">${TAT() ? '📚' : '🔒'} Mode Tathbiq</span><h2>Soal acak dari semua jilid</h2>${TAT() ? `<p>3 nyawa. Naik tahap tiap 10 soal: Tathbiq 1 sampai 6, lalu Takhossus. XP tanpa batas!</p><small>Rekor: ${me.best['0:endless'] || 0} XP · Tahap tertinggi: ${me.tstage ? STG[me.tstage - 1][0] : '-'}</small>` : `<p>Terkunci. Selesaikan semua quest Jilid 1–4 (minimal ${PASS()}% benar di tiap level) untuk membuka mode ini.</p><small>Jilid selesai: ${[1, 2, 3, 4].filter(JD).length}/4</small>`}</div><button class="btn" id="endStart"${TAT() ? '' : ' disabled'}>${TAT() ? 'Mulai' : '🔒 Terkunci'}</button></div>
     <div class="grid">` + [1, 2, 3, 4].map((j, n) => `<div class="card jc" style="--i:${n + 1};${jst(j)}"><span class="tag">Jilid ${j}${JD(j) ? (JP(j) ? ' 💯' : ' 🏅') : ' · ' + JN(j) + '/3'}</span><div class="lvls">` +
@@ -446,6 +537,7 @@ function vHome() {
         return `<button class="lvl ${cl}" data-j="${j}" data-l="${k}"><span class="ic">${ic}</span><b>${nm}</b><small>${c} soal${grOf(j, k) ? ' · <span class="gr">' + grOf(j, k)[0] + '</span>' : ''}</small><span class="xp">${b}/${x} XP</span><i class="pb"><u style="width:${b / x * 100}%"></u></i>${grOf(j, k) ? '<span class="done" title="' + grOf(j, k)[0] + '">' + grOf(j, k)[1] + '</span>' : ''}</button>`;
       }).join('') + `</div></div>`).join('') + `</div>`;
   count($('#tx'), tot);
+  $('#dailyGo').onclick = () => go('daily');
   $('#endStart').onclick = async () => { try { vEndless(await api('endless/start', {})); } catch (e) { alert(e.message); } };
   setTimeout(() => { $('#pg').style.background = RANKS[ri][3]; $('#pg').style.width = (nx ? (tot - RANKS[ri][0]) / (nx[0] - RANKS[ri][0]) * 100 : 100) + '%'; }, 80);
   V.querySelectorAll('.lvl').forEach(b => b.onclick = async () => {
@@ -614,7 +706,8 @@ const GUIDE = {
     <li>Di <b>Profil</b> kamu bisa mengganti username, foto, dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, dan Diamond diraih dari total XP. Peringkat 1 di leaderboard mendapat bingkai api 🔥.</li>
-    <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya. Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li></ul>`,
+    <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya. Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
+    <li><b>Kuis Harian:</b> 10 soal acak dari semua jilid, sekali sehari dan tidak bisa diulang. Nilai minimal 80 memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
