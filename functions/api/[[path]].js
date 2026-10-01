@@ -107,38 +107,26 @@ export async function onRequest({ request, env, params }) {
       const j = +url.searchParams.get('jilid'), l = url.searchParams.get('level');
       const n = { easy: 10, medium: 20, hard: 30 }[l];
       if (!(j >= 1 && j <= 4) || !n) return bad('Pilihan tidak valid');
-      const qs = await sql`select id, q, a, b, c, d from questions where jilid = ${j} order by random() limit ${n}`;
+      // Soal + kunci dikirim sekaligus: klien memeriksa jawaban sendiri (tanpa request per soal). Nilai tetap dihitung ulang di server saat submit.
+      const qs = await sql`select id, q, a, b, c, d, answer from questions where jilid = ${j} order by random() limit ${n}`;
       if (!qs.length) return bad('Belum ada soal untuk jilid ini');
-      const token = await sign({ k: 'quiz', uid, j, l, ids: qs.map(x => x.id), nonce: crypto.randomUUID(), exp: Date.now() + 72e5 }, S);
+      const token = await sign({ k: 'quiz', uid, j, l, ids: qs.map(x => x.id), nonce: crypto.randomUUID(), t0: Date.now(), exp: Date.now() + 72e5 }, S);
       return J({ questions: qs, token });
-    }
-
-    if (route === 'POST check') {
-      const t = await verify(String(body.token || ''), S);
-      if (!t || t.k !== 'quiz' || t.uid !== uid) return bad('Sesi kuis tidak valid atau kedaluwarsa');
-      const id = +body.id, c = String(body.choice || '');
-      if (!t.ids.includes(id) || !/^[ABCD]$/.test(c)) return bad('Jawaban tidak valid');
-      // satu round trip: ambil kunci jawaban + catat jawaban (ok dihitung di database)
-      const [[r], ins] = await sql.transaction([
-        sql`select answer from questions where id = ${id}`,
-        sql`insert into quiz_answers (nonce, qid, ok) values (${t.nonce}, ${id}, coalesce((select answer from questions where id = ${id}) = ${c}, false)) on conflict do nothing returning ok`]);
-      if (!r) return bad('Soal tidak ditemukan');
-      if (!ins.length) return bad('Soal ini sudah dijawab', 409);
-      return J({ ok: ins[0].ok, answer: r.answer });
     }
 
     if (route === 'POST submit') {
       const t = await verify(String(body.token || ''), S);
       if (!t || t.k !== 'quiz' || t.uid !== uid) return bad('Sesi kuis tidak valid atau kedaluwarsa');
       const total = t.ids.length, XP = { easy: 100, medium: 200, hard: 300 };
+      if (Date.now() - (t.t0 || 0) < total * 1000) return bad('Terlalu cepat. Baca soal dengan teliti, lalu kirim lagi.', 429); // batas wajar anti-curang
+      const an = body.answers && typeof body.answers === 'object' ? body.answers : {};
+      const ids = t.ids.filter(id => /^[ABCD]$/.test(an[id])), ls = ids.map(id => an[id]);
       let row;
       try {
-        // hitung benar + simpan percobaan dalam satu statement
-        [row] = await sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
-          values (${uid}, ${t.j}, ${t.l}, ${total},
-            (select count(*)::int from quiz_answers where nonce = ${t.nonce} and ok),
-            (select round(count(*) * 100.0 / ${total})::int from quiz_answers where nonce = ${t.nonce} and ok),
-            ${t.nonce})
+        // jawaban klien dicocokkan dengan kunci di database, lalu percobaan disimpan
+        [row] = await sql`with c as (select count(*)::int n from unnest(${ids}::int[], ${ls}::text[]) as a(id, l) join questions q on q.id = a.id and q.answer = a.l)
+          insert into attempts (user_id, jilid, level, total, correct, score, nonce)
+          select ${uid}::int, ${t.j}::int, ${t.l}::text, ${total}::int, c.n, round(c.n * 100.0 / ${total}::int)::int, ${t.nonce}::text from c
           returning correct, score`;
       } catch (e) {
         if (e.code === '23505') return bad('Kuis ini sudah pernah dikirim', 409);
@@ -152,48 +140,54 @@ export async function onRequest({ request, env, params }) {
       const [[usr], best] = await sql.transaction([sql`select role from users where id = ${uid}`, bestOf(uid)]);
       if (!usr) return bad('Silakan masuk dulu', 401);
       if (usr.role !== 'admin' && !jilidDone(best).every(Boolean)) return bad('Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai', 403);
-      // pilih soal acak + buat sesi dalam satu statement
-      // CTE bernama "pick" (bukan "q"): nama "q" bentrok dengan kolom q, sehingga to_jsonb(q) hanya menghasilkan teks pertanyaan
-      // dan soal tampil "undefined". Sesi lama yang belum selesai ditutup sekalian.
+      // Tathbiq dimuat per paket 30 soal (lengkap dengan kunci). Urutan asked = urutan soal yang dikirim ke klien.
+      const qs = await sql`select id, q, a, b, c, d, answer from questions order by random() limit 30`;
+      if (!qs.length) return bad('Belum ada soal');
       const [, [r]] = await sql.transaction([
         sql`update endless_runs set done = true, cur = null where user_id = ${uid} and not done`,
-        sql`with pick as (select id, q, a, b, c, d from questions order by random() limit 1),
-          ins as (insert into endless_runs (user_id, asked, n, cur) select ${uid}::int, array[pick.id], 1, pick.id from pick returning id)
-          select ins.id as run, to_jsonb(pick) as question from ins, pick`]);
-      if (!r) return bad('Belum ada soal');
-      return J({ run: r.run, question: r.question, n: 1, lives: 3, score: 0 });
+        sql`insert into endless_runs (user_id, asked, n) values (${uid}, ${qs.map(x => x.id)}::int[], 1) returning id`]);
+      return J({ run: r.id, questions: qs });
     }
 
-    if (route === 'POST endless/answer') {
-      const c = String(body.choice || '');
-      if (!/^[ABCD]$/.test(c)) return bad('Jawaban tidak valid');
-      // sesi + kunci jawaban + kandidat soal berikutnya dalam satu query
-      const [r] = await sql`select r.id, r.lives, r.score, r.correct, r.n, r.cur, r.done, r.asked, q.answer,
-          (select to_jsonb(x) from (select id, q, a, b, c, d from questions where id <> all(r.asked) order by random() limit 1) x) as nxt
-        from endless_runs r left join questions q on q.id = r.cur
-        where r.id = ${+body.run || 0} and r.user_id = ${uid}`;
+    if (route === 'POST endless/more') {
+      const [r] = await sql`select id, asked, done from endless_runs where id = ${+body.run || 0} and user_id = ${uid}`;
       if (!r || r.done) return bad('Sesi endless sudah berakhir', 409);
-      if (!r.answer) { // soal dihapus admin saat sesi berjalan: akhiri sesi dengan rapi, skor tetap tersimpan
-        await sql`update endless_runs set done = true, cur = null where id = ${r.id}`;
-        return bad('Soal ini baru dihapus admin, sesi diakhiri. Skormu tetap tersimpan. Tekan Berhenti.', 410);
+      const qs = await sql`select id, q, a, b, c, d, answer from questions where id <> all(${r.asked}::int[]) order by random() limit 30`;
+      if (qs.length) await sql`update endless_runs set asked = asked || ${qs.map(x => x.id)}::int[] where id = ${r.id} and not done`;
+      return J({ questions: qs });
+    }
+
+    if (route === 'POST endless/sync') {
+      // Klien mengirim urutan huruf jawaban sejak titik "from"; server memutar ulang nyawa, skor, dan tahap terhadap kunci di database.
+      let ch = Array.isArray(body.choices) ? body.choices.slice(0, 300) : [];
+      if (!ch.every(c => /^[ABCD]$/.test(c))) return bad('Jawaban tidak valid');
+      const [r] = await sql`select id, lives, score, correct, n, asked, done from endless_runs where id = ${+body.run || 0} and user_id = ${uid}`;
+      if (!r || r.done) return bad('Sesi endless sudah berakhir', 409);
+      const off = r.n - 1 - (+body.from || 0); // kiriman ulang: buang jawaban yang sudah diproses
+      if (off < 0 || off > ch.length) return bad('Jawaban tidak valid');
+      ch = ch.slice(off);
+      const ids = r.asked.slice(r.n - 1, r.n - 1 + ch.length);
+      if (ids.length < ch.length) return bad('Jawaban tidak valid');
+      const key = Object.fromEntries((await sql`select id, answer from questions where id = any(${ids}::int[])`).map(k => [k.id, k.answer]));
+      let { lives, score, correct, n } = r, over = false;
+      for (let i = 0; i < ch.length; i++) {
+        if (key[ids[i]]) { // soal yang dihapus admin dilewati
+          if (key[ids[i]] === ch[i]) { score += 10 * Math.ceil(n / 10); correct++; }
+          else if (--lives <= 0) { over = true; break; }
+        }
+        n++;
       }
-      const ok = r.answer === c, pts = ok ? 10 * Math.ceil(r.n / 10) : 0;
-      const lives = r.lives - (ok ? 0 : 1), score = r.score + pts, correct = r.correct + (ok ? 1 : 0);
-      const next = lives > 0 ? r.nxt : null;
-      const over = !next, n = next ? r.n + 1 : r.n;
-      // satu round trip: update (dijaga dengan cur/done) + catat percobaan dari kondisi terbaru di DB.
-      // Percobaan dibaca dari baris sesi itu sendiri, jadi dua request bersamaan tidak bisa saling menimpa.
-      const [upd] = await sql.transaction([
-        sql`update endless_runs set lives = ${lives}, score = ${score}, correct = ${correct}, n = ${n},
-          asked = ${next ? [...r.asked, next.id] : r.asked}::int[], cur = ${next ? next.id : null}, done = ${over}
-          where id = ${r.id} and cur = ${r.cur} and not done returning id`,
-        sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
-          select user_id, 0, 'endless', case when done then n else n - 1 end, correct, score, 'endless-' || id
-          from endless_runs where id = ${r.id}
-          on conflict (nonce) do update set total = excluded.total, correct = excluded.correct, score = excluded.score`]);
+      const done = over || body.end === true;
+      const qs = [sql`update endless_runs set lives = ${lives}, score = ${score}, correct = ${correct}, n = ${n}, done = ${done}, cur = null
+        where id = ${r.id} and n = ${r.n} and not done returning id`];
+      if (n > 1) qs.push(sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
+        select user_id, 0, 'endless', case when lives <= 0 then n else n - 1 end, correct, score, 'endless-' || id
+        from endless_runs where id = ${r.id}
+        on conflict (nonce) do update set total = excluded.total, correct = excluded.correct, score = excluded.score`);
+      const [upd] = await sql.transaction(qs);
       if (!upd.length) return bad('Jawaban ini sudah dikirim', 409);
       LB.clear();
-      return J({ ok, answer: r.answer, pts, lives, score, correct, next, over, cleared: over && lives > 0 });
+      return J({ lives, score, correct, over: done });
     }
 
     if (route === 'POST password') {
