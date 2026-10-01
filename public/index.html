@@ -591,14 +591,34 @@ const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok,
   e.onload = ok; e.onerror = () => { xlsxP = null; no(new Error('Gagal memuat pustaka Excel. Periksa koneksi internet.')); };
   document.head.appendChild(e);
 });
-async function vAdmin() {
-  loadX().catch(() => {}); // mulai unduh di latar belakang
-  let st;
-  try { st = await api('admin/stats'); } catch (e) { V.textContent = e.message; return; }
+let admTab = 'stat';
+const ago = t => { if (!t) return 'belum pernah'; const m = (Date.now() - new Date(t)) / 6e4; return m < 1 ? 'baru saja' : m < 60 ? Math.floor(m) + ' menit lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
+function vAdmin() {
+  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['user', '👥 Kelola murid']].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
+  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, user: adminUsers })[t](ab); };
+  V.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
+  show(admTab);
+}
+
+/* ---------- Admin: statistik ---------- */
+async function adminStats(box) {
+  box.innerHTML = '<p class="muted">Memuat…</p>';
+  let s; try { s = await api('admin/stats'); } catch (e) { box.textContent = e.message; return; }
+  if (!$('#ab')) return;
+  const tile = (n, t) => `<div class="card" style="text-align:center"><h1 style="margin:0">${n}</h1><span class="muted" style="margin:0">${t}</span></div>`;
+  box.innerHTML = `<div class="grid">${tile(s.users, 'Murid terdaftar')}${tile(s.active7, 'Aktif 7 hari terakhir')}${tile(s.new7, 'Murid baru 7 hari')}${tile(s.attempts, 'Total percobaan')}</div>
+    <div class="card"><h2>Per jilid</h2>${[1, 2, 3, 4].map(j => { const x = s.byJilid[j] || {}; return `<div class="urow"><div><span class="tag" style="margin:0;background:${JC[j][0]};color:${JC[j][2]}">Jilid ${j}</span> <b>${s.q[j] || 0} soal</b></div><div class="muted" style="margin:0;text-align:right;font-size:.88rem">${x.students || 0} murid · ${x.attempts || 0} percobaan · rata-rata nilai ${x.avg || 0}</div></div>`; }).join('')}</div>
+    <div class="card"><h2>Sebaran rank</h2>${RANKS.map((r, n) => `<div class="urow"><span style="min-width:110px">${r[2]} ${r[1]}</span><div class="prog" style="flex:1"><i style="width:${s.users ? s.ranks[n] / s.users * 100 : 0}%;background:${r[3]}"></i></div><b style="min-width:28px;text-align:right">${s.ranks[n]}</b></div>`).join('')}</div>`;
+}
+
+/* ---------- Admin: kelola soal (unggah Excel + daftar soal) ---------- */
+async function adminSoal(box) {
+  loadX().catch(() => {}); // mulai unduh pustaka Excel di latar belakang
+  let st; try { st = await api('admin/stats'); } catch (e) { box.textContent = e.message; return; }
+  if (!$('#ab')) return;
   let rows = [];
-  V.innerHTML = `<h1>Panel Admin</h1><div class="grid">` +
-    [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2 id="sc${j}">${st.q[j] || 0} soal</h2></div>`).join('') +
-    `</div><div class="card"><p class="muted">Kolom Excel: <code>jilid, pertanyaan, A, B, C, D, jawaban</code> (jawaban = huruf A–D). ${st.users} murid · ${st.attempts} percobaan.</p>
+  box.innerHTML = `<div class="grid">` + [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2 id="sc${j}">${st.q[j] || 0} soal</h2></div>`).join('') +
+    `</div><div class="card"><h2>Unggah soal dari Excel</h2><p class="muted">Kolom: <code>jilid, pertanyaan, A, B, C, D, jawaban</code> (jawaban = huruf A–D).</p>
     <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="tp">Unduh template Excel</button></div>
     <input type="file" id="fl" accept=".xlsx,.xls,.csv">
     <label class="chk"><input type="checkbox" id="rp"> Ganti soal lama pada jilid yang ada di file</label>
@@ -621,12 +641,26 @@ async function vAdmin() {
       $('#pv').textContent = rows.length + ' baris terbaca.'; $('#up').disabled = !rows.length;
     } catch (x) { $('#err').textContent = /^Gagal memuat/.test(x.message) ? x.message : 'File tidak bisa dibaca.'; }
   };
-  adminQuestions();
-  adminUsers();
   $('#up').onclick = async () => {
     try { const r = await api('admin/questions', { rows, replace: $('#rp').checked }); alert(r.added + ' soal ditambahkan.'); vAdmin(); }
     catch (e) { $('#err').textContent = e.message; }
   };
+  adminQuestions();
+}
+
+/* ---------- Admin: detail statistik satu murid ---------- */
+async function userDetail(id) {
+  let d; try { d = await api('admin/user?id=' + id); } catch (e) { alert(e.message); return; }
+  const b = d.best, tot = Object.values(b).reduce((a, x) => a + x, 0), ri = rkOf(tot), u = d.user;
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="box"><h2>${esc(u.username)}</h2><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span>
+    <p class="muted">${tot} XP · bergabung ${new Date(u.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+    ${[1, 2, 3, 4].map(j => `<div class="urow"><span class="tag" style="margin:0;background:${JC[j][0]};color:${JC[j][2]}">Jilid ${j}</span><span class="muted" style="margin:0;text-align:right;font-size:.88rem">${Object.entries(LV).map(([k, [nm, , x]]) => { const v = b[j + ':' + k] || 0; return nm + ' ' + v + '/' + x + (v >= x * PASS() / 100 ? ' ✅' : ''); }).join(' · ')}</span></div>`).join('')}
+    <div class="urow"><b>📚 Tathbiq</b><span class="muted" style="margin:0">Rekor ${b['0:endless'] || 0} XP · tahap ${d.tstage ? STG[d.tstage - 1][0] : '-'}</span></div>
+    <h2 style="margin-top:14px">10 percobaan terakhir</h2>${d.recent.length ? d.recent.map(r => `<div class="urow"><span>${r.level === 'endless' ? '📚 Tathbiq' : 'Jilid ' + r.jilid + ' · ' + LV[r.level][0]}</span><span class="muted" style="margin:0;text-align:right;font-size:.88rem">${r.level === 'endless' ? r.score + ' XP' : r.correct + '/' + r.total + ' benar · nilai ' + r.score} · ${ago(r.created_at)}</span></div>`).join('') : '<p class="muted">Belum ada percobaan.</p>'}
+    <div class="row"><span></span><button class="btn" id="udx">Tutup</button></div></div>`;
+  document.body.appendChild(m);
+  const close = () => m.remove(); m.querySelector('#udx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
 }
 
 /* ---------- Admin: kelola soal ---------- */
@@ -655,7 +689,7 @@ function qEditor(r, done) {
   };
 }
 function adminQuestions() {
-  V.insertAdjacentHTML('beforeend', `<div class="card" id="qm"><h2>Kelola soal</h2>
+  $('#ab').insertAdjacentHTML('beforeend', `<div class="card" id="qm"><h2>Kelola soal</h2>
     <div class="tabs">${['Semua', 1, 2, 3, 4].map((x, n) => `<button data-qj="${n}" class="${n === qmJ ? 'on' : ''}">${n ? 'Jilid ' + x : x}</button>`).join('')}</div>
     <input type="search" id="qmq" placeholder="Cari isi pertanyaan…" value="${esc(qmQ)}" autocomplete="off">
     <div class="row" style="margin:0 0 12px"><button class="btn" id="qmAdd">+ Tambah soal</button><button class="btn ghost del" id="qmDel" disabled>Hapus terpilih</button></div>
@@ -667,7 +701,7 @@ function adminQuestions() {
     const my = ++seq;
     try {
       const d = await api(`admin/questions?jilid=${qmJ}&q=${encodeURIComponent(qmQ)}&offset=${qmOff}`);
-      if (my !== seq) return;
+      if (my !== seq || !$('#qml')) return;
       if (!d.rows.length && qmOff > 0) { qmOff = Math.max(0, qmOff - QPAGE); return load(); }
       rows = d.rows;
       $('#qml').innerHTML = (d.rows.length ? d.rows.map((r, n) => `<div class="urow qrow"><label class="chk"><input type="checkbox" data-id="${r.id}" aria-label="Pilih soal"></label>
@@ -694,15 +728,16 @@ function adminQuestions() {
 }
 
 function adminUsers() {
-  V.insertAdjacentHTML('beforeend', `<div class="card"><h2>Kelola murid</h2><input type="search" id="uq" placeholder="Cari username…" autocomplete="off"><div id="ul" class="muted">Memuat…</div></div>`);
+  $('#ab').insertAdjacentHTML('beforeend', `<div class="card"><h2>Kelola murid</h2><input type="search" id="uq" placeholder="Cari username…" autocomplete="off"><div id="ul" class="muted">Memuat…</div></div>`);
   let t, seq = 0;
   const load = async () => {
     const my = ++seq;
     try {
       const d = await api('admin/users?q=' + encodeURIComponent($('#uq').value.trim()));
-      if (my !== seq) return;
-      $('#ul').innerHTML = (d.users.length ? d.users.map(x => `<div class="urow"><div><b>${esc(x.username)}</b>${x.role === 'admin' ? ' <span class="chip">admin</span>' : ''}<div class="muted" style="margin:0;font-size:.85rem">${x.xp} XP · ${x.attempts} percobaan</div></div>${x.role === 'admin' ? '' : `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" style="padding:8px 16px" data-rp="${x.id}" data-n="${esc(x.username)}">Reset password</button><button class="btn ghost del" data-id="${x.id}" data-n="${esc(x.username)}">Hapus</button></div>`}</div>`).join('') : 'Tidak ada murid ditemukan.') +
+      if (my !== seq || !$('#ul')) return;
+      $('#ul').innerHTML = (d.users.length ? d.users.map(x => `<div class="urow"><div><b>${esc(x.username)}</b>${x.role === 'admin' ? ' <span class="chip">admin</span>' : ''}<div class="muted" style="margin:0;font-size:.85rem">${x.xp} XP · ${x.attempts} percobaan · aktif ${ago(x.last)}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" style="padding:8px 16px" data-d="${x.id}">Detail</button>${x.role === 'admin' ? '' : `<button class="btn ghost" style="padding:8px 16px" data-rp="${x.id}" data-n="${esc(x.username)}">Reset password</button><button class="btn ghost del" data-id="${x.id}" data-n="${esc(x.username)}">Hapus</button>`}</div></div>`).join('') : 'Tidak ada murid ditemukan.') +
         (d.total > d.users.length ? `<p class="muted">Menampilkan ${d.users.length} dari ${d.total}. Gunakan pencarian.</p>` : '');
+      $('#ul').querySelectorAll('[data-d]').forEach(b => b.onclick = () => userDetail(+b.dataset.d));
       $('#ul').querySelectorAll('[data-rp]').forEach(b => b.onclick = async () => {
         const pw = prompt(`Password baru untuk "${b.dataset.n}" (6–128 karakter). Sampaikan ke murid, lalu sarankan menggantinya di Profil.`);
         if (pw === null) return;
