@@ -341,7 +341,7 @@ function vHome() {
 
 /* ---------- Kuis ---------- */
 function vQuiz(d, j, l) {
-  const qs = d.questions, wrong = []; let i = 0, streak = 0;
+  const qs = d.questions, wrong = [], ans = {}; let i = 0, streak = 0;
   const draw = () => {
     const q = qs[i];
     V.innerHTML = `<div class="card jc" style="${jst(j)}"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
@@ -352,24 +352,22 @@ function vQuiz(d, j, l) {
     const h = $('#qt'), all = V.querySelectorAll('.opt');
     typeIt(h, q.q);
     h.onclick = () => { clearInterval(tt); h.textContent = q.q; h.classList.remove('cur'); };
-    all.forEach(b => b.onclick = async () => {
+    all.forEach(b => b.onclick = () => { // jawaban diperiksa di perangkat: tanpa menunggu server
       all.forEach(x => x.disabled = true);
-      try {
-        const r = await api('check', { token: d.token, id: q.id, choice: b.dataset.k });
-        clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
-        [...all].find(x => x.dataset.k === r.answer).classList.add('ok');
-        if (r.ok) { streak++; const bb = b.getBoundingClientRect(); burst(bb.left + bb.width / 2, bb.top + bb.height / 2, 18); }
-        else { b.classList.add('no'); streak = 0; wrong.push({ q: q.q, a: q[r.answer.toLowerCase()], k: r.answer }); }
-        const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
-        $('#fb').innerHTML = r.ok
-          ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
-          : `<div class="fb no">Belum tepat. Jawaban yang benar: ${r.answer}</div>`;
-        $('#nx').hidden = false; $('#nx').focus();
-      } catch (e) { alert(e.message); all.forEach(x => x.disabled = false); }
+      const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
+      clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
+      [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
+      if (ok) { streak++; const bb = b.getBoundingClientRect(); burst(bb.left + bb.width / 2, bb.top + bb.height / 2, 18); }
+      else { b.classList.add('no'); streak = 0; wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
+      $('#fb').innerHTML = ok
+        ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
+        : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
+      $('#nx').hidden = false; $('#nx').focus();
     });
     $('#nx').onclick = async () => {
       if (i < qs.length - 1) { i++; draw(); return; }
-      try { vResult(await api('submit', { token: d.token }), j, l, wrong); } catch (e) { alert(e.message); }
+      try { vResult(await api('submit', { token: d.token, answers: ans }), j, l, wrong); } catch (e) { alert(e.message); }
     };
   };
   draw();
@@ -395,9 +393,17 @@ function vResult(r, j, l, wrong) {
 
 /* ---------- Endless ---------- */
 function vEndless(d) {
-  const run = d.run; noteStage(d.n); let q = d.question, n = d.n, lives = 3, score = 0, correct = 0, answered = 0;
+  /* Soal dimuat per paket 30 (lengkap dengan kunci); paket berikutnya diambil saat tersisa 5 soal. Skor disinkronkan ke server per paket, saat selesai, dan saat halaman ditutup. */
+  const run = d.run, Q = d.questions, ch = []; let idx = 0, n = 1, lives = 3, score = 0, correct = 0, sent = 0, more = null, ex = false, ended = false, chain = Promise.resolve();
+  noteStage(1);
   const hearts = () => '❤️'.repeat(lives) + '🖤'.repeat(3 - lives);
+  const sync = end => chain = chain.then(() => { const k = ch.length; return api('endless/sync', { run, from: sent, choices: ch.slice(sent), end: !!end }).then(() => { sent = k; }); }).catch(() => {});
+  const hide = () => { if (!ended && ch.length > sent) fetch('/api/endless/sync', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ run, from: sent, choices: ch.slice(sent) }) }).catch(() => {}); };
+  addEventListener('pagehide', hide);
+  const fin = r => { ended = true; removeEventListener('pagehide', hide); vEndResult(r); };
+  const prefetch = () => { if (more || ex) return; sync(); more = api('endless/more', { run }).then(r => { if (r.questions.length) Q.push(...r.questions); else ex = true; }).catch(() => {}).finally(() => { more = null; }); };
   const draw = () => {
+    const q = Q[idx];
     V.innerHTML = `<div class="card end"><div class="meta"><span class="chip" id="hp">${hearts()}</span><span class="chip" id="sc">⭐ ${score}</span></div>
       <p class="muted"><span class="chip" style="${stgStyle(n)}">${stg(n)[0]}</span> Soal #${n} · benar = +${10 * Math.ceil(n / 10)} XP</p><h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, i) => `<button class="opt" style="--i:${i}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
@@ -405,22 +411,28 @@ function vEndless(d) {
     const h = $('#qt'), all = V.querySelectorAll('.opt'), text = q.q;
     typeIt(h, text);
     h.onclick = () => { clearInterval(tt); h.textContent = text; h.classList.remove('cur'); };
-    $('#st').onclick = () => { api('endless/stop', { run }).catch(() => {}); vEndResult({ score, correct, answered }); };
-    all.forEach(b => b.onclick = async () => {
+    $('#st').onclick = () => { sync(true); fin({ score, correct, answered: ch.length }); };
+    all.forEach(b => b.onclick = () => {
       all.forEach(x => x.disabled = true); $('#st').disabled = true;
-      try {
-        const r = await api('endless/answer', { run, choice: b.dataset.k });
-        clearInterval(tt); h.textContent = text; h.classList.remove('cur');
-        [...all].find(x => x.dataset.k === r.answer).classList.add('ok');
-        lives = r.lives; score = r.score; correct = r.correct; answered++;
-        if (r.ok) { const bb = b.getBoundingClientRect(); burst(bb.left + bb.width / 2, bb.top + bb.height / 2, 18); $('#sc').classList.add('pop'); }
-        else { b.classList.add('no'); $('#hp').classList.add('shk'); }
-        $('#hp').textContent = hearts(); $('#sc').textContent = '⭐ ' + score;
-        $('#fb').innerHTML = r.ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])} +${r.pts} XP</div>`
-          : `<div class="fb no">Nyawa berkurang. Jawaban yang benar: ${r.answer}</div>`;
-        const nx = $('#nx'); nx.hidden = false; nx.textContent = r.over ? 'Lihat hasil' : 'Lanjut →'; nx.focus();
-        nx.onclick = () => { if (r.over) vEndResult({ score, correct, answered, cleared: r.cleared }); else { q = r.next; n++; noteStage(n); draw(); } };
-      } catch (e) { alert(e.message); all.forEach(x => x.disabled = false); $('#st').disabled = false; }
+      const k = b.dataset.k, ok = k === q.answer, pts = ok ? 10 * Math.ceil(n / 10) : 0;
+      ch.push(k); if (ok) { score += pts; correct++; } else lives--;
+      clearInterval(tt); h.textContent = text; h.classList.remove('cur');
+      [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
+      if (ok) { const bb = b.getBoundingClientRect(); burst(bb.left + bb.width / 2, bb.top + bb.height / 2, 18); $('#sc').classList.add('pop'); }
+      else { b.classList.add('no'); $('#hp').classList.add('shk'); }
+      $('#hp').textContent = hearts(); $('#sc').textContent = '⭐ ' + score;
+      $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])} +${pts} XP</div>`
+        : `<div class="fb no">Nyawa berkurang. Jawaban yang benar: ${q.answer}</div>`;
+      const over = lives <= 0; if (over) sync(true); else if (Q.length - idx - 1 <= 5) prefetch();
+      const nx = $('#nx'); nx.hidden = false; nx.textContent = over ? 'Lihat hasil' : 'Lanjut →'; nx.focus();
+      nx.onclick = async () => {
+        if (over) return fin({ score, correct, answered: ch.length });
+        if (idx + 1 >= Q.length) {
+          prefetch(); await more;
+          if (idx + 1 >= Q.length) { if (!ex) { alert('Gagal memuat soal berikutnya. Coba lagi.'); return; } sync(true); return fin({ score, correct, answered: ch.length, cleared: true }); }
+        }
+        idx++; n++; noteStage(n); draw();
+      };
     });
   };
   draw();
