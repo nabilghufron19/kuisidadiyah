@@ -18,6 +18,9 @@ const PASS_PCT = 60, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT 
 const keyCache = new Map(); // CryptoKey cukup dibuat sekali per isolate, bukan tiap request
 const hmacKey = s => keyCache.get(s) || (keyCache.set(s, crypto.subtle.importKey('raw', enc.encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])), keyCache.get(s));
 const LB = new Map(), LB_TTL = 10000; // cache leaderboard per isolate (hasilnya sama untuk semua pengguna)
+const REPORT_DAY = 30;                   // maksimal laporan soal per murid per hari
+const REPORT_KINDS = ['kunci', 'ketik', 'ambigu', 'lain'];
+const babOf = x => String(x ?? '').trim().replace(/\s+/g, ' ');
 const PW_MAX = 128;                       // batas panjang password (mencegah PBKDF2 pada input raksasa)
 const LOGIN_MAX = 8, LOGIN_MIN = 15;      // maksimal 8 kali gagal per username dalam 15 menit
 const DUMMY_SALT = new Uint8Array(16);    // dipakai bila username tidak ada, supaya waktu respons sama
@@ -64,6 +67,15 @@ export async function onRequest({ request, env, params }) {
     return [1, 2, 3, 4].map(j => Object.entries(XPMAX).every(([l, x]) => (b[j + ':' + l] || 0) >= x * PASS_PCT / 100));
   };
 
+  // Pemilihan soal: soal ber-bab diprioritaskan dan diambil bergiliran per (jilid, bab) supaya semua bab tercakup;
+  // kekurangannya diisi soal tanpa bab secara acak. Urutan akhir diacak. j = 0 berarti semua jilid; excl = id yang dilewati.
+  const pickQs = (j, n, excl = []) => sql`select id, q, a, b, c, d, answer from (
+      select id, q, a, b, c, d, answer from (
+        select id, q, a, b, c, d, answer, bab is null as nb,
+          case when bab is null then 0 else row_number() over (partition by jilid, lower(bab) order by random()) end as rk
+        from questions where (${j}::int = 0 or jilid = ${j}::int) and id <> all(${excl}::int[])) t
+      order by nb, rk, random() limit ${n}) s order by random()`;
+
   try {
     // ---------- Daftar & masuk ----------
     if (route === 'POST register') {
@@ -103,15 +115,16 @@ export async function onRequest({ request, env, params }) {
 
     if (route === 'GET me') {
       // satu round trip untuk tiga query
-      const [[usr], best, [t], [sp], [bn]] = await sql.transaction([
+      const [[usr], best, [t], [sp], [bn], [rq]] = await sql.transaction([
         sql`select username, role, avatar, fx, fxa, fxn, on_board from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
         sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
-        sql`select gold_bonus(${uid}::int) s`]);
+        sql`select gold_bonus(${uid}::int) s`,
+        sql`select case when (select role from users where id = ${uid}) = 'admin' then (select count(distinct question_id) from question_reports where status = 'open') else 0 end::int n`]);
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
-      return J({ username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -119,7 +132,7 @@ export async function onRequest({ request, env, params }) {
       const n = { easy: 10, medium: 20, hard: 30 }[l];
       if (!(j >= 1 && j <= 4) || !n) return bad('Pilihan tidak valid');
       // Soal + kunci dikirim sekaligus: klien memeriksa jawaban sendiri (tanpa request per soal). Nilai tetap dihitung ulang di server saat submit.
-      const qs = await sql`select id, q, a, b, c, d, answer from questions where jilid = ${j} order by random() limit ${n}`;
+      const qs = await pickQs(j, n);
       if (!qs.length) return bad('Belum ada soal untuk jilid ini');
       const token = await sign({ k: 'quiz', uid, j, l, ids: qs.map(x => x.id), nonce: crypto.randomUUID(), t0: Date.now(), exp: Date.now() + 72e5 }, S);
       return J({ questions: qs, token });
@@ -152,7 +165,7 @@ export async function onRequest({ request, env, params }) {
       if (!usr) return bad('Silakan masuk dulu', 401);
       if (usr.role !== 'admin' && !jilidDone(best).every(Boolean)) return bad('Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai', 403);
       // Tathbiq dimuat per paket 30 soal (lengkap dengan kunci). Urutan asked = urutan soal yang dikirim ke klien.
-      const qs = await sql`select id, q, a, b, c, d, answer from questions order by random() limit 30`;
+      const qs = await pickQs(0, 30);
       if (!qs.length) return bad('Belum ada soal');
       const [, [r]] = await sql.transaction([
         sql`update endless_runs set done = true, cur = null where user_id = ${uid} and not done`,
@@ -163,7 +176,7 @@ export async function onRequest({ request, env, params }) {
     if (route === 'POST endless/more') {
       const [r] = await sql`select id, asked, done from endless_runs where id = ${+body.run || 0} and user_id = ${uid}`;
       if (!r || r.done) return bad('Sesi endless sudah berakhir', 409);
-      const qs = await sql`select id, q, a, b, c, d, answer from questions where id <> all(${r.asked}::int[]) order by random() limit 30`;
+      const qs = await pickQs(0, 30, r.asked);
       if (qs.length) await sql`update endless_runs set asked = asked || ${qs.map(x => x.id)}::int[] where id = ${r.id} and not done`;
       return J({ questions: qs });
     }
@@ -251,6 +264,23 @@ export async function onRequest({ request, env, params }) {
       return J({ username: un, avatar: av, fx, board: ob });
     }
 
+    // ---------- Laporan soal salah (murid -> admin) ----------
+    if (route === 'POST report') {
+      const qid = +body.question, kind = String(body.kind || ''), note = String(body.note || '').trim().slice(0, 200);
+      if (!Number.isInteger(qid) || qid < 1) return bad('Soal tidak valid');
+      if (!REPORT_KINDS.includes(kind)) return bad('Pilih jenis masalahnya');
+      if (kind === 'lain' && !note) return bad('Tulis singkat masalahnya');
+      const [[ex], [cnt]] = await sql.transaction([
+        sql`select 1 from questions where id = ${qid}`,
+        sql`select count(*)::int n from question_reports where user_id = ${uid} and created_at > now() - interval '1 day'`]);
+      if (!ex) return bad('Soal ini sudah tidak ada', 404);
+      if (cnt.n >= REPORT_DAY) return bad('Batas laporan hari ini sudah tercapai. Terima kasih!', 429);
+      const ins = await sql`insert into question_reports (question_id, user_id, kind, note) values (${qid}, ${uid}, ${kind}, ${note || null})
+        on conflict (question_id, user_id) where status = 'open' do nothing returning id`;
+      if (!ins.length) return bad('Kamu sudah melaporkan soal ini. Admin akan memeriksanya.', 409);
+      return J({ ok: true });
+    }
+
     // ---------- Toko ----------
     const shopState = async () => {
       const [best, own, [u], [bn]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_bonus(${uid}::int) s`]);
@@ -302,7 +332,7 @@ export async function onRequest({ request, env, params }) {
       return J({ today: t || null, pending: p.n, pity: y.n, need: PITY, rare: RARE, prizes: PRIZES });
     }
     if (route === 'POST daily/start') {
-      const qs = await sql`select id, q, a, b, c, d, answer from questions order by random() limit ${DAILY_N}`;
+      const qs = await pickQs(0, DAILY_N);
       if (qs.length < DAILY_N) return bad('Soal belum cukup untuk kuis harian (minimal ' + DAILY_N + ' soal)');
       // baris dibuat saat mulai: satu kesempatan per hari, tidak bisa diulang walau halaman ditutup
       const [r] = await sql`insert into daily (user_id, day) values (${uid}, (now() at time zone 'Asia/Jakarta')::date) on conflict do nothing returning day::text as d`;
@@ -397,7 +427,7 @@ export async function onRequest({ request, env, params }) {
 
     if (route === 'GET admin/stats') {
       // statistik hanya menghitung murid (bukan admin). Batas rank harus sama dengan RANKS di index.html: 300/700/1200/1800/3000 (Legend).
-      const [q, [c], bj, [rk]] = await sql.transaction([
+      const [q, [c], bj, [rk], [rp], bb] = await sql.transaction([
         sql`select jilid, count(*)::int n from questions group by jilid`,
         sql`select (select count(*) from users where role = 'student')::int users,
           (select count(*) from users where role = 'student' and created_at > now() - interval '7 days')::int new7,
@@ -408,8 +438,11 @@ export async function onRequest({ request, env, params }) {
         sql`with best as (select user_id, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts group by user_id, jilid, level),
           tot as (select u.id, coalesce(sum(b.xp), 0)::int t from users u left join best b on b.user_id = u.id where u.role = 'student' group by u.id)
           select count(*) filter (where t < 300)::int r0, count(*) filter (where t >= 300 and t < 700)::int r1, count(*) filter (where t >= 700 and t < 1200)::int r2,
-            count(*) filter (where t >= 1200 and t < 1800)::int r3, count(*) filter (where t >= 1800 and t < 3000)::int r4, count(*) filter (where t >= 3000)::int r5 from tot`]);
-      return J({ q: Object.fromEntries(q.map(r => [r.jilid, r.n])), ...c, byJilid: Object.fromEntries(bj.map(r => [r.jilid, r])), ranks: [rk.r0, rk.r1, rk.r2, rk.r3, rk.r4, rk.r5] });
+            count(*) filter (where t >= 1200 and t < 1800)::int r3, count(*) filter (where t >= 1800 and t < 3000)::int r4, count(*) filter (where t >= 3000)::int r5 from tot`,
+        sql`select count(distinct question_id)::int n from question_reports where status = 'open'`,
+        sql`select jilid, min(bab) bab, count(*)::int n from questions where bab is not null group by jilid, lower(bab) order by jilid, min(bab)`]);
+      const babs = {}; for (const r of bb) (babs[r.jilid] ||= []).push({ bab: r.bab, n: r.n });
+      return J({ q: Object.fromEntries(q.map(r => [r.jilid, r.n])), ...c, byJilid: Object.fromEntries(bj.map(r => [r.jilid, r])), ranks: [rk.r0, rk.r1, rk.r2, rk.r3, rk.r4, rk.r5], reports: rp.n, babs });
     }
 
     if (route === 'POST admin/questions') {
@@ -417,11 +450,11 @@ export async function onRequest({ request, env, params }) {
       if (!Array.isArray(rows) || !rows.length || rows.length > 2000) return bad('Data soal kosong atau lebih dari 2000 baris');
       for (const [i, r] of rows.entries()) {
         const ok = [1, 2, 3, 4].includes(r.jilid) && [r.q, r.a, r.b, r.c, r.d].every(x => typeof x === 'string' && x) &&
-          typeof r.answer === 'string' && /^[ABCD]$/.test(r.answer);
-        if (!ok) return bad(`Baris ${i + 2} tidak valid (jilid 1–4, semua kolom terisi, jawaban A–D)`);
+          typeof r.answer === 'string' && /^[ABCD]$/.test(r.answer) && babOf(r.bab).length <= 60;
+        if (!ok) return bad(`Baris ${i + 2} tidak valid (jilid 1–4, soal dan pilihan terisi, jawaban A–D, bab maksimal 60 karakter)`);
       }
-      const ins = sql`insert into questions (jilid, q, a, b, c, d, answer)
-        select * from unnest(${rows.map(r => r.jilid)}::int[], ${rows.map(r => r.q)}::text[], ${rows.map(r => r.a)}::text[],
+      const ins = sql`insert into questions (jilid, bab, q, a, b, c, d, answer)
+        select * from unnest(${rows.map(r => r.jilid)}::int[], ${rows.map(r => babOf(r.bab) || null)}::text[], ${rows.map(r => r.q)}::text[], ${rows.map(r => r.a)}::text[],
           ${rows.map(r => r.b)}::text[], ${rows.map(r => r.c)}::text[], ${rows.map(r => r.d)}::text[], ${rows.map(r => r.answer)}::text[])`;
       if (body.replace) await sql.transaction([sql`delete from questions where jilid = any(${[...new Set(rows.map(r => r.jilid))]})`, ins]);
       else await ins;
@@ -431,16 +464,16 @@ export async function onRequest({ request, env, params }) {
     if (route === 'GET admin/questions') {
       const j = +url.searchParams.get('jilid') || 0, q = (url.searchParams.get('q') || '').trim().slice(0, 60);
       const off = Math.max(0, +url.searchParams.get('offset') || 0), like = '%' + q.replace(/[\\%_]/g, '\\$&') + '%';
-      const rows = await sql`select id, jilid, q, a, b, c, d, answer from questions
-        where (${j}::int = 0 or jilid = ${j}::int) and (${q}::text = '' or q ilike ${like})
+      const rows = await sql`select id, jilid, bab, q, a, b, c, d, answer from questions
+        where (${j}::int = 0 or jilid = ${j}::int) and (${q}::text = '' or q ilike ${like} or bab ilike ${like})
         order by jilid, id limit 30 offset ${off}`;
-      const [{ n }] = await sql`select count(*)::int n from questions where (${j}::int = 0 or jilid = ${j}::int) and (${q}::text = '' or q ilike ${like})`;
+      const [{ n }] = await sql`select count(*)::int n from questions where (${j}::int = 0 or jilid = ${j}::int) and (${q}::text = '' or q ilike ${like} or bab ilike ${like})`;
       return J({ rows, total: n });
     }
 
     // Unduh seluruh bank soal (format kolom sama dengan template unggah, jadi bisa dipakai sebagai backup/restore).
     if (route === 'GET admin/questions-export') {
-      const rows = await sql`select jilid, q, a, b, c, d, answer from questions order by jilid, id`;
+      const rows = await sql`select jilid, bab, q, a, b, c, d, answer from questions order by jilid, id`;
       return J({ rows });
     }
 
@@ -456,11 +489,13 @@ export async function onRequest({ request, env, params }) {
 
     if (route === 'POST admin/question-save') {
       const id = +body.id || 0, j = +body.jilid, f = ['q', 'a', 'b', 'c', 'd'].map(k => String(body[k] ?? '').trim()), ans = String(body.answer || '').toUpperCase();
+      const bab = babOf(body.bab);
       if (![1, 2, 3, 4].includes(j) || f.some(x => !x) || !/^[ABCD]$/.test(ans)) return bad('Jilid 1–4, semua kolom terisi, jawaban A–D');
+      if (bab.length > 60) return bad('Bab maksimal 60 karakter');
       if (id) {
-        const r = await sql`update questions set jilid = ${j}, q = ${f[0]}, a = ${f[1]}, b = ${f[2]}, c = ${f[3]}, d = ${f[4]}, answer = ${ans} where id = ${id} returning id`;
+        const r = await sql`update questions set jilid = ${j}, bab = ${bab || null}, q = ${f[0]}, a = ${f[1]}, b = ${f[2]}, c = ${f[3]}, d = ${f[4]}, answer = ${ans} where id = ${id} returning id`;
         if (!r.length) return bad('Soal tidak ditemukan', 404);
-      } else await sql`insert into questions (jilid, q, a, b, c, d, answer) values (${j}, ${f[0]}, ${f[1]}, ${f[2]}, ${f[3]}, ${f[4]}, ${ans})`;
+      } else await sql`insert into questions (jilid, bab, q, a, b, c, d, answer) values (${j}, ${bab || null}, ${f[0]}, ${f[1]}, ${f[2]}, ${f[3]}, ${f[4]}, ${ans})`;
       return J({ ok: true });
     }
 
@@ -470,6 +505,21 @@ export async function onRequest({ request, env, params }) {
       try { await sql`delete from questions where id = any(${ids}::int[])`; }
       catch (e) { if (e.code === '23503') return bad('Soal masih terhubung ke data lain', 409); throw e; }
       return J({ deleted: ids.length });
+    }
+
+    if (route === 'GET admin/reports') {
+      const rows = await sql`select q.id, q.jilid, q.bab, q.q, q.a, q.b, q.c, q.d, q.answer, count(*)::int n, max(r.created_at) last,
+          json_agg(json_build_object('kind', r.kind, 'note', r.note, 'by', u.username, 'at', r.created_at) order by r.created_at desc) rs
+        from question_reports r join questions q on q.id = r.question_id join users u on u.id = r.user_id
+        where r.status = 'open' group by q.id order by n desc, last desc limit 100`;
+      return J({ rows });
+    }
+
+    if (route === 'POST admin/report-resolve') {
+      const id = +body.question;
+      if (!Number.isInteger(id) || id < 1) return bad('Soal tidak valid');
+      const r = await sql`update question_reports set status = 'done' where question_id = ${id} and status = 'open' returning id`;
+      return J({ resolved: r.length });
     }
 
     if (route === 'POST admin/reset-password') {
