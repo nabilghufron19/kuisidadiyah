@@ -74,24 +74,69 @@ XP rekor adalah nilai terbaik per kombinasi (jilid, level), dijumlahkan. Untuk T
 3. Salin connection string database.
 
 ### 2. Deploy ke Cloudflare Pages
-1. Push project ke GitHub, lalu hubungkan repositori di Cloudflare Pages.
-2. Tidak perlu perintah build; direktori output adalah root project.
-3. Tambahkan **environment variables** (Settings → Variables and Secrets):
+1. Pastikan `package.json` ada di root repositori (lihat contoh di bawah) dan folder `functions/api/` berisi `[[path]].js`. Lalu push ke GitHub.
+2. Di dashboard Cloudflare: **Workers & Pages → Create → Pages → Connect to Git**, pilih repositori.
+3. Isi **Build settings** seperti ini:
+
+   | Pengaturan               | Isi |
+   |--------------------------|-----|
+   | Production branch        | `main` (atau branch yang Anda pakai) |
+   | Framework preset         | `None` |
+   | Build command            | `npm install` |
+   | Build output directory   | `/` |
+   | Root directory (advanced)| kosongkan (default) |
+
+   Catatan:
+   - Project ini tidak punya langkah build karena `index.html` sudah siap pakai. Perintah `npm install` ada agar dependensi backend (`@neondatabase/serverless`) terpasang. Cloudflare juga memasang dependensi dari `package.json` saat build, jadi `npm install` di sini sekadar jaga-jaga.
+   - Kalau Cloudflare menolak kolom Build command kosong, `exit 0` juga bisa dipakai.
+   - Build output directory `/` berarti file statis diambil dari root repositori. Karena itu `index.html`, `logo.png`, dan `favicon.png` harus ada di root, bukan di subfolder.
+   - Folder `functions/` di root otomatis dikenali Cloudflare sebagai Pages Functions. Tidak perlu pengaturan tambahan.
+4. Buka **Environment variables** (saat setup awal, atau nanti di *Settings → Variables and Secrets*) dan tambahkan:
 
    | Nama           | Isi |
    |----------------|-----|
-   | `DATABASE_URL` | Connection string Neon |
-   | `JWT_SECRET`   | String acak panjang untuk menandatangani token. Jaga kerahasiaannya |
+   | `DATABASE_URL` | Connection string Neon, contoh `postgresql://user:password@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require` |
+   | `JWT_SECRET`   | String acak panjang (minimal 32 karakter) untuk menandatangani token. Jaga kerahasiaannya |
 
-4. Pastikan dependensi terpasang. Contoh `package.json` minimal:
+   Isi untuk **Production**, dan juga **Preview** bila Anda memakai preview deployment (sebaiknya `DATABASE_URL` Preview mengarah ke Neon Branch terpisah). Menghasilkan `JWT_SECRET` bisa dengan `openssl rand -base64 48`.
+5. Klik **Save and Deploy**. Setelah selesai, aplikasi tersedia di `https://<nama-project>.pages.dev`.
+6. Setiap kali Anda mengubah environment variable, lakukan **deploy ulang** (Deployments → Retry deployment, atau push commit baru) agar nilainya terbaca.
 
-   ```json
-   {
-     "dependencies": {
-       "@neondatabase/serverless": "^0.10.0"
-     }
-   }
-   ```
+Contoh `package.json` minimal:
+
+```json
+{
+  "name": "almiftah-kuis",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.0"
+  }
+}
+```
+
+### Uji di komputer sendiri (opsional)
+
+Pakai Wrangler untuk menjalankan frontend dan API sekaligus secara lokal:
+
+```bash
+npm install
+```
+
+Buat file `.dev.vars` di root project (jangan di-commit, masukkan ke `.gitignore`):
+
+```
+DATABASE_URL=postgresql://...
+JWT_SECRET=isi-acak-untuk-development
+```
+
+Lalu jalankan:
+
+```bash
+npx wrangler pages dev .
+```
+
+Aplikasi akan terbuka di `http://localhost:8788`. Gunakan Neon Branch terpisah untuk `DATABASE_URL` lokal agar data produksi aman.
 
 ### 3. Buat akun admin
 1. Daftar lewat aplikasi (akun baru otomatis berperan `student`).
@@ -182,4 +227,4 @@ Batas rank (300/700/1200/1800) didefinisikan di dua tempat dan **harus sama**: `
 
 ## Lisensi
 
-Tentukan sesuai kebutuhan (belum ditentukan).
+Syain Adzim (nabil ghufron) 1447 1448
