@@ -315,6 +315,13 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 @keyframes flip3{to{transform:rotateY(360deg)}}
 .lite .si .stage span{animation:none}
 @keyframes shim{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 22px -4px var(--tc)}}
+/* lapor soal */
+.rptw{text-align:right;margin:-2px 0 6px}
+.rpt{font:inherit;font-size:.78rem;font-weight:600;color:var(--muted,#7a8a80);background:transparent;border:1px solid var(--line);border-radius:999px;padding:2px 10px;cursor:pointer}
+.rpt:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.rpt:disabled{opacity:.6;cursor:default}
+.rkinds label{display:flex;gap:10px;align-items:center;margin:6px 0;cursor:pointer}.rkinds input{width:auto;margin:0}
+.bablist{margin:6px 0 0;font-size:.8rem}
 </style>
 </head>
 <body>
@@ -345,6 +352,36 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 let tok = null, me = null, justReg = false;
 try { tok = localStorage.getItem('tk'); } catch (e) {}
 
+/* ---------- Lapor soal ---------- */
+const REPD = new Set(), RKL = { kunci: 'Kunci jawaban salah', ketik: 'Salah ketik / pilihan keliru', ambigu: 'Soal ambigu', lain: 'Lainnya' };
+const rptBtn = id => REPD.has(id) ? `<button type="button" class="rpt" data-r="${id}" disabled>🚩 Terlaporkan</button>` : `<button type="button" class="rpt" data-r="${id}" title="Laporkan jika soal ini salah">🚩 Lapor</button>`;
+const rptRow = id => `<div class="rptw">${rptBtn(id)}</div>`;
+const bindRpts = () => document.querySelectorAll('#view [data-r]:not(:disabled)').forEach(b => b.onclick = () => openReport(+b.dataset.r));
+function openReport(qid) {
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="box"><h2>Laporkan soal</h2><p class="muted">Ada yang salah dengan soal ini? Pilih masalahnya, admin akan memeriksa.</p>
+    <div class="rkinds">${Object.entries(RKL).map(([k, t], n) => `<label><input type="radio" name="rk" value="${k}"${n ? '' : ' checked'}> ${t}</label>`).join('')}</div>
+    <textarea id="rkn" rows="2" maxlength="200" placeholder="Catatan (opsional, maks 200 huruf)"></textarea>
+    <div class="err" id="rke"></div><div class="row"><button class="btn ghost" id="rkx">Batal</button><button class="btn" id="rks">Kirim laporan</button></div></div>`;
+  document.body.appendChild(m);
+  const close = () => m.remove(); m.querySelector('#rkx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+  m.querySelector('#rks').onclick = async e => {
+    const b = e.currentTarget; b.disabled = true;
+    try {
+      await api('report', { question: qid, kind: m.querySelector('input[name=rk]:checked').value, note: m.querySelector('#rkn').value });
+      REPD.add(qid); close(); toast('Laporan terkirim. Jazakumullahu khairan!', '🚩');
+      document.querySelectorAll(`[data-r="${qid}"]`).forEach(x => { x.disabled = true; x.textContent = '🚩 Terlaporkan'; });
+    } catch (x) {
+      if (/sudah melaporkan/.test(x.message)) { REPD.add(qid); document.querySelectorAll(`[data-r="${qid}"]`).forEach(y => { y.disabled = true; y.textContent = '🚩 Terlaporkan'; }); }
+      m.querySelector('#rke').textContent = x.message; b.disabled = false;
+    }
+  };
+}
+const setRep = n => {
+  if (me) me.reports = Math.max(0, n);
+  const nv = $('#navAdmin'); if (nv && me && me.role === 'admin') nv.textContent = 'Panel Admin' + (me.reports ? ' 🚩' + me.reports : '');
+  const tb = document.querySelector('[data-t="lap"]'); if (tb && me) tb.textContent = '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '');
+};
 async function api(p, b) {
   const r = await fetch('/api/' + p, {
     method: b ? 'POST' : 'GET',
@@ -746,10 +783,10 @@ function vDailyQuiz(d) {
     const q = qs[i];
     V.innerHTML = `<div class="card"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
       <div class="meta"><span class="muted">🎯 Kuis Harian · Soal ${i + 1}/${qs.length}</span></div>
-      <h2 dir="auto" id="qt"></h2><div>` +
+      ${rptRow(q.id)}<h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
       `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
-    const h = $('#qt'), all = V.querySelectorAll('.opt');
+    const h = $('#qt'), all = V.querySelectorAll('.opt'); bindRpts();
     typeIt(h, q.q);
     h.onclick = () => { clearInterval(tt); h.textContent = q.q; h.classList.remove('cur'); };
     all.forEach(b => b.onclick = () => {
@@ -757,7 +794,7 @@ function vDailyQuiz(d) {
       const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
       clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
-      if (ok) ansFx(b); else { b.classList.add('no'); wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      if (ok) ansFx(b); else { b.classList.add('no'); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
       $('#nx').hidden = false; $('#nx').focus();
     });
@@ -772,7 +809,8 @@ function vDailyResult(r, wrong) {
   V.innerHTML = `<div class="card res"><div class="big">${r.pass ? '🎉' : '💪'}</div><span class="tag">Hasil Kuis Harian</span><h1>${r.correct} / ${r.total}</h1>
     <p class="muted">Nilai ${r.score}. ${r.pass ? 'Kamu berhak 1× spin hadiah!' : 'Butuh minimal ' + DAILY_PASS + ' untuk spin. Coba lagi besok.'}</p>
     <div class="row"><span></span><button class="btn" id="dn">${r.pass ? '🎰 Spin hadiah' : 'Kembali'}</button></div></div>` +
-    (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
+    (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
+  bindRpts();
   if (r.pass) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
   $('#dn').onclick = () => go(r.pass ? 'daily' : 'home');
 }
@@ -843,10 +881,10 @@ function vQuiz(d, j, l) {
     const q = qs[i];
     V.innerHTML = `<div class="card jc" style="${jst(j)}"><div class="bar"><i style="width:${i / qs.length * 100}%"></i></div>
       <div class="meta"><span class="muted">Jilid ${j} · ${LV[l][0]} · Soal ${i + 1}/${qs.length}</span><span class="chip" id="cb">🔥 ${streak}</span></div>
-      <h2 dir="auto" id="qt"></h2><div>` +
+      ${rptRow(q.id)}<h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
       `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
-    const h = $('#qt'), all = V.querySelectorAll('.opt');
+    const h = $('#qt'), all = V.querySelectorAll('.opt'); bindRpts();
     typeIt(h, q.q);
     h.onclick = () => { clearInterval(tt); h.textContent = q.q; h.classList.remove('cur'); };
     all.forEach(b => b.onclick = () => { // jawaban diperiksa di perangkat: tanpa menunggu server
@@ -855,7 +893,7 @@ function vQuiz(d, j, l) {
       clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
       if (ok) { streak++; ansFx(b); }
-      else { b.classList.add('no'); streak = 0; wrong.push({ q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
+      else { b.classList.add('no'); streak = 0; wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       const cb = $('#cb'); cb.textContent = '🔥 ' + streak; cb.classList.add('pop');
       $('#fb').innerHTML = ok
         ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}${streak > 2 ? ' ' + streak + ' beruntun!' : ''}</div>`
@@ -882,8 +920,8 @@ function vResult(r, j, l, wrong) {
     ${GR(r.score) ? `<span class="gtag" style="background:${GR(r.score)[2]}">${GR(r.score)[1]} ${GR(r.score)[0]} · quest selesai</span>` : `<p class="muted">Belum lulus. Butuh minimal ${PASS()}% benar agar quest ini selesai.</p>`}
     <span class="chip pop">${gain ? '+' + gain + ' XP dan +' + gain + ' ' + GL + ' masuk ke totalmu' : 'Rekor di level ini: ' + prev + ' XP. Lampaui untuk menambah total.'}</span>
     <div class="row"><button class="btn" id="hm">Kembali</button><button class="btn ghost" id="lb">Lihat leaderboard</button></div></div>` +
-    (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p></div>`).join('') : '');
-  count($('#rx'), r.xp);
+    (wrong.length ? `<h2>Pembahasan (${wrong.length} salah)</h2>` + wrong.map((w, n) => `<div class="card" style="--i:${n}"><p dir="auto"><b>${esc(w.q)}</b></p><p class="muted" dir="auto">Jawaban benar: ${w.k}. ${esc(w.a)}</p>${w.id ? rptRow(w.id) : ''}</div>`).join('') : '');
+  bindRpts(); count($('#rx'), r.xp);
   if (r.score >= 70) [0, 250, 500].forEach(t => setTimeout(() => burst(innerWidth / 2, 130, 36), t));
   $('#hm').onclick = () => go('home'); $('#lb').onclick = () => go('board');
 }
@@ -902,10 +940,10 @@ function vEndless(d) {
   const draw = () => {
     const q = Q[idx];
     V.innerHTML = `<div class="card end"><div class="meta"><span class="chip" id="hp">${hearts()}</span><span class="chip" id="sc">⭐ ${score}</span></div>
-      <p class="muted"><span class="chip" style="${stgStyle(n)}">${stg(n)[0]}</span> Soal #${n} · benar = +${10 * Math.ceil(n / 10)} XP</p><h2 dir="auto" id="qt"></h2><div>` +
+      <p class="muted"><span class="chip" style="${stgStyle(n)}">${stg(n)[0]}</span> Soal #${n} · benar = +${10 * Math.ceil(n / 10)} XP</p>${rptRow(q.id)}<h2 dir="auto" id="qt"></h2><div>` +
       ['a', 'b', 'c', 'd'].map((k, i) => `<button class="opt" style="--i:${i}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
       `</div><div id="fb"></div><div class="row"><button class="btn ghost" id="st">Berhenti</button><button class="btn" id="nx" hidden>Lanjut →</button></div></div>`;
-    const h = $('#qt'), all = V.querySelectorAll('.opt'), text = q.q;
+    const h = $('#qt'), all = V.querySelectorAll('.opt'), text = q.q; bindRpts();
     typeIt(h, text);
     h.onclick = () => { clearInterval(tt); h.textContent = text; h.classList.remove('cur'); };
     $('#st').onclick = () => { sync(true); fin({ score, correct, answered: ch.length }); };
@@ -1135,8 +1173,8 @@ const loadX = () => window.XLSX ? Promise.resolve() : xlsxP ||= new Promise((ok,
 let admTab = 'stat';
 const ago = t => { if (!t) return 'belum pernah'; const m = (Date.now() - new Date(t)) / 6e4; return m < 1 ? 'baru saja' : m < 60 ? Math.floor(m) + ' menit lalu' : m < 1440 ? Math.floor(m / 60) + ' jam lalu' : Math.floor(m / 1440) + ' hari lalu'; };
 function vAdmin() {
-  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['user', '👥 Kelola murid']].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
-  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, user: adminUsers })[t](ab); };
+  V.innerHTML = `<h1>Panel Admin</h1><div class="tabs">${[['stat', '📊 Statistik'], ['soal', '📝 Kelola soal'], ['user', '👥 Kelola murid'], ['lap', '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '')]].map(([k, n]) => `<button data-t="${k}" class="${k === admTab ? 'on' : ''}">${n}</button>`).join('')}</div><div id="ab"></div>`;
+  const show = t => { admTab = t; V.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x.dataset.t === t)); const ab = $('#ab'); ab.innerHTML = ''; ({ stat: adminStats, soal: adminSoal, user: adminUsers, lap: adminReports })[t](ab); };
   V.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
   show(admTab);
 }
@@ -1158,16 +1196,19 @@ async function adminSoal(box) {
   let st; try { st = await api('admin/stats'); } catch (e) { box.textContent = e.message; return; }
   if (!$('#ab')) return;
   let rows = [];
-  box.innerHTML = `<div class="grid">` + [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2 id="sc${j}">${st.q[j] || 0} soal</h2></div>`).join('') +
-    `</div><div class="card"><h2>Unggah soal dari Excel</h2><p class="muted">Kolom: <code>jilid, pertanyaan, A, B, C, D, jawaban</code> (jawaban = huruf A–D).</p>
+  box.innerHTML = `<div class="grid">` + [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2 id="sc${j}">${st.q[j] || 0} soal</h2><p class="muted bablist" id="sb${j}">${babLine(st, j)}</p></div>`).join('') +
+    `</div><div class="card"><h2>Unggah soal dari Excel</h2><p class="muted">Kolom: <code>jilid, bab, pertanyaan, A, B, C, D, jawaban</code> (jawaban = huruf A–D). Kolom <code>bab</code> boleh kosong atau dihapus; soal tanpa bab tetap dipakai sebagai cadangan acak, sedangkan soal ber-bab diprioritaskan dan kuis berusaha mencakup semua bab.</p>
     <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="tp">Unduh template Excel</button></div>
     <input type="file" id="fl" accept=".xlsx,.xls,.csv">
     <label class="chk"><input type="checkbox" id="rp"> Ganti soal lama pada jilid yang ada di file</label>
     <div class="muted" id="pv"></div><div class="err" id="err"></div><button class="btn" id="up" disabled>Unggah soal</button></div>`;
   $('#tp').onclick = async () => {
     try { await loadX(); } catch (e) { alert(e.message); return; }
-    const w = XLSX.utils.aoa_to_sheet([['jilid', 'pertanyaan', 'A', 'B', 'C', 'D', 'jawaban'], [1, 'Contoh pertanyaan?', 'Opsi 1', 'Opsi 2', 'Opsi 3', 'Opsi 4', 'A']]);
-    const b = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(b, w, 'Soal'); XLSX.writeFile(b, 'template-soal.xlsx');
+    const w = XLSX.utils.aoa_to_sheet([['jilid', 'bab', 'pertanyaan', 'A', 'B', 'C', 'D', 'jawaban'], [1, 'Bab 1', 'Contoh pertanyaan?', 'Opsi 1', 'Opsi 2', 'Opsi 3', 'Opsi 4', 'A']]);
+    w['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 50 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 8 }];
+    const pt = XLSX.utils.aoa_to_sheet([['Kolom', 'Keterangan'], ['jilid', 'Wajib. Angka 1–4.'], ['bab', 'Opsional. Nama atau nomor bab, mis. "Bab 1" atau "Isim". Tulis konsisten (huruf besar/kecil dianggap sama). Kosongkan bila belum ada bab.'], ['pertanyaan', 'Wajib.'], ['A, B, C, D', 'Wajib. Empat pilihan jawaban.'], ['jawaban', 'Wajib. Huruf A, B, C, atau D.']]);
+    pt['!cols'] = [{ wch: 14 }, { wch: 90 }];
+    const b = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(b, w, 'Soal'); XLSX.utils.book_append_sheet(b, pt, 'Petunjuk'); XLSX.writeFile(b, 'template-soal.xlsx');
   };
   $('#fl').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
@@ -1177,9 +1218,13 @@ async function adminSoal(box) {
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
       rows = raw.map(o => {
         const n = {}; for (const k in o) n[k.trim().toLowerCase()] = String(o[k]).trim();
-        return { jilid: +n.jilid, q: n.pertanyaan, a: n.a, b: n.b, c: n.c, d: n.d, answer: (n.jawaban || '').toUpperCase() };
+        return { jilid: +n.jilid, bab: (n.bab || '').replace(/\s+/g, ' '), q: n.pertanyaan, a: n.a, b: n.b, c: n.c, d: n.d, answer: (n.jawaban || '').toUpperCase() };
       });
-      $('#pv').textContent = rows.length + ' baris terbaca.'; $('#up').disabled = !rows.length;
+      const wb2 = rows.filter(r => r.bab).length, sum = {};
+      rows.forEach(r => { if (r.bab) { const m = sum[r.jilid] ||= {}, k = r.bab.toLowerCase(); (m[k] ||= { t: r.bab, n: 0 }).n++; } });
+      $('#pv').innerHTML = rows.length + ' baris terbaca' + (wb2 ? ' · ' + wb2 + ' ber-bab, ' + (rows.length - wb2) + ' tanpa bab' : ' · tanpa bab (diacak seperti biasa)') +
+        Object.keys(sum).sort().map(j => '<br>Jilid ' + esc(j) + ': ' + Object.values(sum[j]).map(x => esc(x.t) + ' (' + x.n + ')').join(', ')).join('');
+      $('#up').disabled = !rows.length;
     } catch (x) { $('#err').textContent = /^Gagal memuat/.test(x.message) ? x.message : 'File tidak bisa dibaca.'; }
   };
   $('#up').onclick = async () => {
@@ -1207,14 +1252,39 @@ async function userDetail(id) {
 /* ---------- Admin: kelola soal ---------- */
 let qmJ = 0, qmQ = '', qmOff = 0;
 const QPAGE = 30;
+const babLine = (st, j) => { const a = ((st.babs || {})[j] || []).slice().sort((x, y) => x.bab.localeCompare(y.bab, 'id', { numeric: true })); return a.length ? 'Bab: ' + a.map(x => esc(x.bab) + ' (' + x.n + ')').join(' · ') : 'Belum ada bab, soal diacak'; };
 async function refreshStats() {
-  try { const st = await api('admin/stats'); [1, 2, 3, 4].forEach(j => { const e = $('#sc' + j); if (e) e.textContent = (st.q[j] || 0) + ' soal'; }); } catch (e) {}
+  try { const st = await api('admin/stats'); [1, 2, 3, 4].forEach(j => { const e = $('#sc' + j); if (e) e.textContent = (st.q[j] || 0) + ' soal'; const b = $('#sb' + j); if (b) b.innerHTML = babLine(st, j); }); setRep(st.reports || 0); } catch (e) {}
+}
+async function adminReports(box) {
+  box.innerHTML = '<p class="muted">Memuat…</p>';
+  let d; try { d = await api('admin/reports'); } catch (e) { box.textContent = e.message; return; }
+  if (!$('#ab')) return;
+  setRep(d.rows.length);
+  if (!d.rows.length) { box.innerHTML = '<div class="card"><p class="muted" style="margin:0">Tidak ada laporan baru. 🎉</p></div>'; return; }
+  const dt = x => new Date(x).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+  box.innerHTML = '<p class="muted">Soal yang dilaporkan murid, paling banyak dilaporkan di atas.</p>' + d.rows.map(r => `<div class="card" data-q="${r.id}">
+    <div><span class="chip">Jilid ${r.jilid}</span>${r.bab ? ' <span class="chip">' + esc(r.bab) + '</span>' : ''} <b>${r.n} laporan</b></div>
+    <p dir="auto" style="margin:10px 0 4px"><b>${esc(r.q)}</b></p>
+    ${['a', 'b', 'c', 'd'].map(k => `<div class="qopt" dir="auto"><b>${k.toUpperCase()}</b> ${esc(r[k])}${k.toUpperCase() === r.answer ? ' ✅' : ''}</div>`).join('')}
+    <div class="muted" style="font-size:.85rem;margin-top:10px">${r.rs.slice(0, 5).map(x => `🚩 ${RKL[x.kind] || x.kind}${x.note ? ': ' + esc(x.note) : ''} <span style="opacity:.7">(${esc(x.by)}, ${dt(x.at)})</span>`).join('<br>')}${r.rs.length > 5 ? '<br>+' + (r.rs.length - 5) + ' laporan lain' : ''}</div>
+    <div class="row"><button class="btn ghost" data-a="ok">Tandai selesai</button><button class="btn ghost" data-a="ed">Edit soal</button><button class="btn ghost" data-a="del">Hapus soal</button></div></div>`).join('');
+  const drop = id => { const c = box.querySelector(`[data-q="${id}"]`); if (c) c.remove(); setRep((me.reports || 1) - 1); if (!box.querySelector('[data-q]')) adminReports(box); };
+  box.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
+    const card = b.closest('[data-q]'), id = +card.dataset.q, r = d.rows.find(x => x.id === id), a = b.dataset.a;
+    try {
+      if (a === 'ok') { await api('admin/report-resolve', { question: id }); drop(id); }
+      else if (a === 'del') { if (!confirm('Hapus soal ini dari bank soal?')) return; await api('admin/question-delete', { ids: [id] }); drop(id); toast('Soal dihapus', '🗑️'); }
+      else qEditor(r, async () => { try { await api('admin/report-resolve', { question: id }); } catch (e) {} adminReports(box); });
+    } catch (e) { alert(e.message); }
+  });
 }
 function qEditor(r, done) {
-  r = r || { jilid: qmJ || 1, q: '', a: '', b: '', c: '', d: '', answer: 'A' };
+  r = r || { jilid: qmJ || 1, bab: '', q: '', a: '', b: '', c: '', d: '', answer: 'A' };
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="box"><h2>${r.id ? 'Edit soal' : 'Tambah soal'}</h2>
     <select id="qej">${[1, 2, 3, 4].map(j => `<option value="${j}"${j === r.jilid ? ' selected' : ''}>Jilid ${j}</option>`).join('')}</select>
+    <input id="qebab" dir="auto" placeholder="Bab (opsional), mis. Bab 1" value="${esc(r.bab || '')}" maxlength="60" autocomplete="off">
     <textarea id="qeq" rows="3" dir="auto" placeholder="Pertanyaan">${esc(r.q)}</textarea>
     ${['a', 'b', 'c', 'd'].map(k => `<input id="qe${k}" dir="auto" placeholder="Pilihan ${k.toUpperCase()}" value="${esc(r[k])}" autocomplete="off">`).join('')}
     <select id="qeans">${['A', 'B', 'C', 'D'].map(k => `<option value="${k}"${k === r.answer ? ' selected' : ''}>Jawaban benar: ${k}</option>`).join('')}</select>
@@ -1224,7 +1294,7 @@ function qEditor(r, done) {
   m.querySelector('#qes').onclick = async () => {
     const g = id => m.querySelector('#' + id).value;
     try {
-      await api('admin/question-save', { id: r.id || 0, jilid: +g('qej'), q: g('qeq'), a: g('qea'), b: g('qeb'), c: g('qec'), d: g('qed'), answer: g('qeans') });
+      await api('admin/question-save', { id: r.id || 0, jilid: +g('qej'), bab: g('qebab'), q: g('qeq'), a: g('qea'), b: g('qeb'), c: g('qec'), d: g('qed'), answer: g('qeans') });
       close(); toast(r.id ? 'Soal diperbarui' : 'Soal ditambahkan', '✅'); done();
     } catch (e) { m.querySelector('#qee').textContent = e.message; }
   };
@@ -1232,7 +1302,7 @@ function qEditor(r, done) {
 function adminQuestions() {
   $('#ab').insertAdjacentHTML('beforeend', `<div class="card" id="qm"><h2>Kelola soal</h2>
     <div class="tabs">${['Semua', 1, 2, 3, 4].map((x, n) => `<button data-qj="${n}" class="${n === qmJ ? 'on' : ''}">${n ? 'Jilid ' + x : x}</button>`).join('')}</div>
-    <input type="search" id="qmq" placeholder="Cari isi pertanyaan…" value="${esc(qmQ)}" autocomplete="off">
+    <input type="search" id="qmq" placeholder="Cari isi pertanyaan atau bab…" value="${esc(qmQ)}" autocomplete="off">
     <div class="row" style="margin:0 0 12px"><button class="btn" id="qmAdd">+ Tambah soal</button><button class="btn ghost del" id="qmDel" disabled>Hapus terpilih</button></div>
     <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="qmExp">⬇️ Unduh semua soal</button><button class="btn ghost del" id="qmAll">🗑️ Hapus semua soal</button></div>
     <div id="qml" class="muted">Memuat…</div></div>`);
@@ -1247,7 +1317,7 @@ function adminQuestions() {
       if (!d.rows.length && qmOff > 0) { qmOff = Math.max(0, qmOff - QPAGE); return load(); }
       rows = d.rows;
       $('#qml').innerHTML = (d.rows.length ? d.rows.map((r, n) => `<div class="urow qrow"><label class="chk"><input type="checkbox" data-id="${r.id}" aria-label="Pilih soal"></label>
-        <div style="flex:1;min-width:0"><span class="chip">Jilid ${r.jilid}</span> <b dir="auto" style="color:var(--ink)">${esc(r.q)}</b>
+        <div style="flex:1;min-width:0"><span class="chip">Jilid ${r.jilid}</span>${r.bab ? ' <span class="chip">' + esc(r.bab) + '</span>' : ''} <b dir="auto" style="color:var(--ink)">${esc(r.q)}</b>
         <div class="qopt" dir="auto">${['a', 'b', 'c', 'd'].map(k => k.toUpperCase() === r.answer ? `<b>✔ ${k.toUpperCase()}. ${esc(r[k])}</b>` : `${k.toUpperCase()}. ${esc(r[k])}`).join(' · ')}</div></div>
         <button class="btn ghost" data-e="${n}">Edit</button></div>`).join('') : 'Tidak ada soal.') +
         `<div class="pager"><button class="btn ghost" id="qpv"${qmOff ? '' : ' disabled'}>← Sebelumnya</button><span class="muted" style="margin:0">${d.total ? qmOff + 1 + '–' + (qmOff + d.rows.length) + ' dari ' + d.total : ''}</span><button class="btn ghost" id="qnx"${qmOff + QPAGE < d.total ? '' : ' disabled'}>Berikutnya →</button></div>`;
@@ -1271,8 +1341,8 @@ function adminQuestions() {
     try {
       const [d] = await Promise.all([api('admin/questions-export'), loadX()]);
       if (!d.rows.length) { alert('Bank soal masih kosong.'); return; }
-      const ws = XLSX.utils.json_to_sheet(d.rows.map(r => ({ jilid: r.jilid, pertanyaan: r.q, A: r.a, B: r.b, C: r.c, D: r.d, jawaban: r.answer })), { header: ['jilid', 'pertanyaan', 'A', 'B', 'C', 'D', 'jawaban'] });
-      ws['!cols'] = [{ wch: 6 }, { wch: 60 }, { wch: 28 }, { wch: 28 }, { wch: 28 }, { wch: 28 }, { wch: 8 }];
+      const ws = XLSX.utils.json_to_sheet(d.rows.map(r => ({ jilid: r.jilid, bab: r.bab || '', pertanyaan: r.q, A: r.a, B: r.b, C: r.c, D: r.d, jawaban: r.answer })), { header: ['jilid', 'bab', 'pertanyaan', 'A', 'B', 'C', 'D', 'jawaban'] });
+      ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 60 }, { wch: 28 }, { wch: 28 }, { wch: 28 }, { wch: 28 }, { wch: 8 }];
       const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Soal');
       XLSX.writeFile(wb, 'bank-soal-' + new Date().toISOString().slice(0, 10) + '.xlsx');
       toast(d.rows.length + ' soal diunduh', '⬇️');
@@ -1336,7 +1406,7 @@ function adminUsers() {
 async function boot() {
   try { me = await api('me'); } catch (e) { tok = null; me = null; try { localStorage.removeItem('tk'); } catch (x) {} }
   document.body.classList.toggle('anon', !me);
-  if (me) { renderChip(); $('#navAdmin').hidden = me.role !== 'admin'; go('home'); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
+  if (me) { renderChip(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
     if (justReg) { justReg = false; openWelcome(g); } else if (g) openGuide(); } else go('auth');
 }
 document.querySelectorAll('.nav[data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
