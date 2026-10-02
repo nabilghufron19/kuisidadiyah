@@ -224,6 +224,10 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .itm{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 4px 8px;border-radius:14px;border:1px solid var(--line);background:var(--bg);opacity:.4;font-size:.8rem;text-align:center;width:100%}
 .itm span{font-size:1.7rem}.itm small{color:var(--tc);font-weight:800;font-size:.68rem}
 .itm.own{opacity:1;border-color:var(--tc);box-shadow:inset 0 0 0 1px var(--tc)}.itm.eq::after{content:'Dipakai';position:absolute;top:-8px;right:6px;background:var(--tc);color:#fff;border-radius:999px;font-size:.62rem;font-weight:800;padding:1px 7px}
+/* ===== Ikon rank (SVG) ===== */
+.ri{display:inline-block;flex:none;object-fit:contain;transition:transform .3s,filter .3s}.medal .ri,.stp .dot .ri{width:100%;height:100%}
+.tag .ri{width:20px;height:20px;vertical-align:-5px;margin:-4px 5px -4px -7px}
+.ac .ri{width:44px;height:44px}.ac:not(.on) .ri{filter:grayscale(1)}
 /* ===== Performa ===== */
 .lpz,.lpz *,.lpz *::before,.lpz *::after{animation-play-state:paused!important}
 .lite .avw.t2,.lite .avw.t3,.lite .avw.t4,.lite .fire{animation:none!important;box-shadow:0 0 calc(var(--t,4px)*3) 0 var(--c1,#ff6a00)}
@@ -235,18 +239,18 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .hero .who{display:flex;align-items:center;gap:14px}
 .hero .who small{display:block;color:var(--muted);font-weight:600;line-height:1.2}
 .hero .who b{font-size:1.35rem;line-height:1.25}
-.medal{width:64px;height:64px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:2rem;background:var(--rc);box-shadow:0 8px 20px -8px var(--rc)}
+.medal{width:72px;height:72px;flex:none;display:grid;place-items:center;filter:drop-shadow(0 6px 12px color-mix(in srgb,var(--rc) 55%,transparent))}
 .hero .xpb{text-align:right}.hero .xpb h1{margin:0 0 6px;line-height:1}.hero .xpb h1 small{font-size:1rem;color:var(--muted);font-weight:700}
 .hero .prog{height:12px;margin:18px 0 8px}
 .hero .cap{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.88rem;font-weight:600;flex-wrap:wrap}
-.track{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin-top:22px}
-.track::before,.track::after{content:'';position:absolute;top:19px;left:10%;height:4px;border-radius:4px}
-.track::before{right:10%;background:var(--line)}
-.track::after{width:calc(80% * var(--p));background:linear-gradient(90deg,var(--lime),var(--rc))}
+.track{--n:6;position:relative;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));margin-top:22px}
+.track::before,.track::after{content:'';position:absolute;top:21px;left:calc(50% / var(--n));height:4px;border-radius:4px}
+.track::before{right:calc(50% / var(--n));background:var(--line)}
+.track::after{width:calc((100% - 100% / var(--n)) * var(--p));background:linear-gradient(90deg,var(--lime),var(--rc))}
 .stp{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;min-width:0}
-.stp .dot{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:1.2rem;background:var(--surface);border:3px solid var(--line);margin-bottom:6px}
-.stp.done .dot{background:var(--rc);border-color:var(--rc)}
-.stp.cur .dot{background:var(--rc);border-color:var(--ink);box-shadow:0 0 0 5px color-mix(in srgb,var(--rc) 35%,transparent)}
+.stp .dot{width:46px;height:46px;display:grid;place-items:center;margin-bottom:4px}
+.stp.lock .dot .ri{filter:grayscale(1) brightness(.75);opacity:.7}
+.stp.cur .dot .ri{transform:scale(1.18);filter:drop-shadow(0 0 7px var(--rc))}
 .stp.lock{opacity:.55}
 .stp b{font-size:.82rem;line-height:1.2;overflow-wrap:anywhere}.stp small{color:var(--muted);font-weight:600;font-size:.72rem}
 .sec{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap;margin:4px 0 12px}
@@ -269,7 +273,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .lvl{min-height:128px}.lvl b{line-height:1.2}.lvl small{font-size:.76rem;line-height:1.25}
 @media(max-width:820px){.modes{grid-template-columns:1fr}}
 @media(max-width:700px){.grid.jgrid{grid-template-columns:1fr}}
-@media(max-width:420px){.hero{padding:16px}.medal{width:52px;height:52px;font-size:1.6rem}.hero .xpb{text-align:left}.stp .dot{width:36px;height:36px;font-size:1rem}.track::before,.track::after{top:16px}.stp small{font-size:.66rem}}
+@media(max-width:420px){.hero{padding:16px}.medal{width:56px;height:56px}.hero .xpb{text-align:left}.stp .dot{width:38px;height:38px}.track::before,.track::after{top:18px}.stp small{font-size:.66rem}}
 /* ===== Spin hadiah ===== */
 .reel{position:relative;overflow:hidden;border-radius:18px;background:var(--bg);border:1px solid var(--line);margin:14px 0;padding:12px 0}
 .strip{display:flex;gap:8px;width:max-content;will-change:transform}
@@ -748,20 +752,22 @@ const JP = j => Object.keys(LV).every(k => pct(j, k) >= 100);
 const ADM = () => !!me && me.role === 'admin';
 const AJD = j => ADM() || JD(j), TS = () => ADM() ? 7 : (me.tstage || 0);
 const JN = j => Object.keys(LV).filter(k => qd(j, k)).length, JD = j => JN(j) === 3, TAT = () => ADM() || [1, 2, 3, 4].every(JD);
-const RANKS = [[0, 'Bronze', '🥉', '#CD7F32'], [300, 'Silver', '🥈', '#B8C2CC'], [700, 'Gold', '🥇', '#F2B705'], [1200, 'Platinum', '🛡️', '#46C2B5'], [1800, 'Diamond', '💎', '#3AA9F0']];
+/* [batas XP, nama, warna teks di atas warna rank, warna rank]. Batas XP harus sama dengan query admin/stats di backend. Ikon: gambar /rank/<nama>.webp (bronze, silver, gold, platinum, diamond, legend). */
+const RANKS = [[0, 'Bronze', '#1a1a1a', '#CD7F32'], [300, 'Silver', '#1a1a1a', '#B8C2CC'], [700, 'Gold', '#1a1a1a', '#F2B705'], [1200, 'Platinum', '#1a1a1a', '#46C2B5'], [1800, 'Diamond', '#1a1a1a', '#3AA9F0'], [3000, 'Legend', '#ffffff', '#B13CFF']];
+const RI = (n, sz = 40) => `<img class="ri" src="/rank/${RANKS[n][1].toLowerCase()}.webp" width="${sz}" height="${sz}" alt="" draggable="false">`;
 const rkOf = t => RANKS.reduce((a, r, n) => t >= r[0] ? n : a, 0), totalXp = () => Object.values(me.best).reduce((a, b) => a + b, 0);
-function noteRank(t0) { const a = rkOf(t0), b = rkOf(totalXp()); if (b > a) setTimeout(() => toast(`Pencapaian baru: <b>${RANKS[b][2]} ${RANKS[b][1]}</b>! Rankmu naik.`, RANKS[b][2]), 500); }
+function noteRank(t0) { const a = rkOf(t0), b = rkOf(totalXp()); if (b > a) setTimeout(() => toast(`Pencapaian baru: <b>${RANKS[b][1]}</b>! Rankmu naik.`, RI(b, 34)), 500); }
 function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0), tat = TAT();
   const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1], rk = RANKS[ri];
   const frac = nx ? (tot - rk[0]) / (nx[0] - rk[0]) : 1, p = Math.min(1, (ri + frac) / (RANKS.length - 1));
   V.innerHTML = `<h1 class="hello">Assalamu'alaikum, ${esc(me.username)}</h1>
     <div class="card hero" style="--rc:${rk[3]}">
-      <div class="top2"><div class="who"><span class="medal">${rk[2]}</span><div><small>Tingkat saat ini</small><b>${rk[1]}</b></div></div>
+      <div class="top2"><div class="who"><span class="medal">${RI(ri, 72)}</span><div><small>Tingkat saat ini</small><b>${rk[1]}</b></div></div>
         <div class="xpb"><h1><span id="tx">0</span> <small>XP</small></h1><span class="gold">${GL} ${gold()}</span></div></div>
       <div class="prog"><i id="pg"></i></div>
       <div class="cap"><span>${nx ? (nx[0] - tot) + ' XP lagi menuju ' + nx[1] : 'Tingkat tertinggi tercapai!'}</span><span>${tot}${nx ? ' / ' + nx[0] : ''} XP</span></div>
-      <div class="track" style="--p:${p}">${RANKS.map((r, n) => `<div class="stp ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${n <= ri ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
+      <div class="track" style="--p:${p};--n:${RANKS.length}">${RANKS.map((r, n) => `<div class="stp ${n < ri ? 'done' : n === ri ? 'cur' : 'lock'}" style="--rc:${r[3]}"><span class="dot">${RI(n, 46)}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
     </div>
     <div class="sec"><h2>Tantangan</h2><span>Kuis harian dan mode tanpa batas</span></div>
     <div class="modes">
@@ -945,13 +951,13 @@ const GUIDE = {
   app: `<ul class="gl"><li>Pilih <b>Jilid 1–4</b> lalu tingkat kesulitan: Mudah 10 soal (maks 100 XP), Sedang 20 soal (maks 200 XP), Sulit 30 soal (maks 300 XP).</li>
     <li>XP sebanding dengan jawaban benar. Yang dihitung hanya <b>rekor terbaik</b> tiap jilid dan level, jadi mengulang hanya menambah XP kalau rekormu terlampaui.</li>
     <li>Jawaban langsung dicek dan tidak bisa diubah setelah dipilih.</li>
-    <li>Total XP menentukan rank liga: ${RANKS.map(r => r[2] + ' ' + r[1] + ' ' + r[0]).join(' · ')} XP.</li>
+    <li>Total XP menentukan rank liga: ${RANKS.map(r => r[1] + ' ' + r[0]).join(' · ')} XP.</li>
     <li><b>Leaderboard</b> mengurutkan murid berdasarkan total XP. Bisa disaring per jilid, ada tab Tathbiq, dan ada kolom cari nama.</li>
     <li>Quest selesai bila benar minimal <b>60%</b>. Nilainya bertingkat: Lulus (60%+), Jayyid (75%+), Mumtaz (90%+), Sempurna (100%), dan tampil di tiap level. Jilid yang ketiga levelnya Sempurna bertanda 💯.</li>
     <li>Level bertanda nilai berarti quest selesai. Selesaikan ketiga level sebuah jilid untuk meraih <b>pencapaian jilid</b> itu. Setelah keempat jilid selesai, <b>Mode Tathbiq</b> terbuka.</li>
     <li>Di <b>Profil</b> kamu bisa mengganti username, foto, dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
-    <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, dan Diamond diraih dari total XP. Peringkat 1 di leaderboard mendapat bingkai api 🔥.</li>
+    <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
     <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya. Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
     <li><b>Kuis Harian:</b> 10 soal acak dari semua jilid, sekali sehari dan tidak bisa diulang. Nilai minimal 80 memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
@@ -986,7 +992,7 @@ async function vProfile() {
   try { Object.assign(me, await api('me')); } catch (e) { V.textContent = e.message; return; }
   const xp = Object.values(me.best).reduce((a, b) => a + b, 0), ri = RANKS.reduce((a, r, n) => xp >= r[0] ? n : a, 0);
   let cur = me.avatar || 'a1', pk = me.fxp == null ? null : me.fxp;
-  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg', fxOf(pk))}</div><div><h1>${esc(me.username)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span>
+  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg', fxOf(pk))}</div><div><h1>${esc(me.username)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
     <p class="muted">${xp} XP · Rekor Tathbiq ${me.best['0:endless'] || 0} XP</p></div></div>
     <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Pilih foto:</p>
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
@@ -994,7 +1000,7 @@ async function vProfile() {
     <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div>
     <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(cur, pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan efek</button></div></div>
     <div class="card"><h2>Pencapaian (${myFx()}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${AJD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${AJD(j) ? (ADM() ? 'Terbuka (admin)' : 'Semua quest selesai') : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < TS() ? ' on' : ''}" style="--c:${s[1]}"><span>${i < TS() ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>
-    <div class="card"><h2>Pencapaian rank (${ADM() ? 5 : ri + 1}/5)</h2><p class="muted">Naik rank dengan mengumpulkan total XP.</p><div class="ach">${RANKS.map((r, n) => { const on = ADM() || n <= ri; return `<div class="ac${on ? ' on' : ''}" style="--c:${r[3]}"><span>${on ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${on ? (ADM() ? 'Terbuka (admin)' : 'Tercapai') : r[0] + ' XP'}</small></div>`; }).join('')}</div></div>`;
+    <div class="card"><h2>Pencapaian rank (${ADM() ? RANKS.length : ri + 1}/${RANKS.length})</h2><p class="muted">Naik rank dengan mengumpulkan total XP.</p><div class="ach">${RANKS.map((r, n) => { const on = ADM() || n <= ri; return `<div class="ac${on ? ' on' : ''}" style="--c:${r[3]}"><span>${RI(n, 44)}</span><b>${r[1]}</b><small>${on ? (ADM() ? 'Terbuka (admin)' : 'Tercapai') : r[0] + ' XP'}</small></div>`; }).join('')}</div></div>`;
   const refresh = () => {
     $('#pav').innerHTML = av(cur, 'lg', fxOf(pk)); $('#fxg').innerHTML = fxGrid(cur, pk);
     $('#fxg').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { pk = b.dataset.f === 'auto' ? null : +b.dataset.f; refresh(); });
@@ -1054,15 +1060,15 @@ async function vBoard(j = 0) {
 /* ---------- Profil pemain (dari leaderboard) ---------- */
 async function openPlayer(un, rk) {
   let d; try { d = await api('player?u=' + encodeURIComponent(un)); } catch (e) { toast(e.message, '⚠️'); return; }
-  const ri = d.admin ? 4 : rkOf(d.total), ts = d.tstage, done = d.ach, nj = done.filter(Boolean).length, own = new Set(d.owned);
+  const ri = d.admin ? RANKS.length - 1 : rkOf(d.total), ts = d.tstage, done = d.ach, nj = done.filter(Boolean).length, own = new Set(d.owned);
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="box pbox"><div class="pl"><div>${av(d.avatar, 'lg', d.fx)}</div><div><h2>${esc(d.username)}</h2>
-      <span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span>${d.admin ? ' <span class="tag">🛡️ Admin</span>' : ''}
+      <span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>${d.admin ? ' <span class="tag">🛡️ Admin</span>' : ''}
       <p class="muted" style="margin:6px 0 0">${rk ? 'Peringkat #' + rk + ' · ' : ''}bergabung ${new Date(d.since).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p></div></div>
     <div class="pst"><div><b>${d.total}</b><small>Total XP</small></div><div><b>${nj}/4</b><small>Jilid khatam</small></div><div><b>${d.best['0:endless'] || 0}</b><small>Rekor Tathbiq</small></div></div>
     <h3>Pencapaian jilid</h3><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${done[j - 1] ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${done[j - 1] ? '🏅' : '🔒'}</span><b>Jilid ${j}</b></div>`).join('')}</div>
     <h3>Tahap Tathbiq</h3><div class="ach">${STG.map((x, i) => `<div class="ac${i < ts ? ' on' : ''}" style="--c:${x[1]}"><span>${i < ts ? x[2] : '🔒'}</span><b>${x[0]}</b></div>`).join('')}</div>
-    <h3>Rank liga</h3><div class="ach">${RANKS.map((r, n) => `<div class="ac${n <= ri ? ' on' : ''}" style="--c:${r[3]}"><span>${n <= ri ? r[2] : '🔒'}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
+    <h3>Rank liga</h3><div class="ach">${RANKS.map((r, n) => `<div class="ac${n <= ri ? ' on' : ''}" style="--c:${r[3]}"><span>${RI(n, 44)}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
     <h3>Koleksi item (${SHOP.filter(x => x[0] === 'confetti' || own.has(x[0])).length}/${SHOP.length})</h3><p class="muted" style="margin:0 0 8px;font-size:.85rem">Ketuk item yang dimiliki untuk melihat efeknya.</p>
     <div class="itg">${SHOP.map(([k, nm, ic, tr]) => { const has = k === 'confetti' || own.has(k), eq = (d.equipped || 'confetti') === k; return `<button class="itm${has ? ' own' : ''}${has && eq ? ' eq' : ''}" style="--tc:${TIER[tr]}" data-k="${k}"${has ? '' : ' disabled'}><span>${has ? ic : '🔒'}</span><b>${nm}</b><small>${tr}</small></button>`; }).join('')}</div>
     <div class="row" style="margin-top:16px"><span></span><button class="btn" id="plx">Tutup</button></div></div>`;
@@ -1101,7 +1107,7 @@ async function adminStats(box) {
   const tile = (n, t) => `<div class="card" style="text-align:center"><h1 style="margin:0">${n}</h1><span class="muted" style="margin:0">${t}</span></div>`;
   box.innerHTML = `<div class="grid">${tile(s.users, 'Murid terdaftar')}${tile(s.active7, 'Aktif 7 hari terakhir')}${tile(s.new7, 'Murid baru 7 hari')}${tile(s.attempts, 'Total percobaan')}</div>
     <div class="card"><h2>Per jilid</h2>${[1, 2, 3, 4].map(j => { const x = s.byJilid[j] || {}; return `<div class="urow"><div><span class="tag" style="margin:0;background:${JC[j][0]};color:${JC[j][2]}">Jilid ${j}</span> <b>${s.q[j] || 0} soal</b></div><div class="muted" style="margin:0;text-align:right;font-size:.88rem">${x.students || 0} murid · ${x.attempts || 0} percobaan · rata-rata nilai ${x.avg || 0}</div></div>`; }).join('')}</div>
-    <div class="card"><h2>Sebaran rank</h2>${RANKS.map((r, n) => `<div class="urow"><span style="min-width:110px">${r[2]} ${r[1]}</span><div class="prog" style="flex:1"><i style="width:${s.users ? s.ranks[n] / s.users * 100 : 0}%;background:${r[3]}"></i></div><b style="min-width:28px;text-align:right">${s.ranks[n]}</b></div>`).join('')}</div>`;
+    <div class="card"><h2>Sebaran rank</h2>${RANKS.map((r, n) => `<div class="urow"><span style="min-width:120px;display:inline-flex;align-items:center;gap:6px">${RI(n, 26)}${r[1]}</span><div class="prog" style="flex:1"><i style="width:${s.users ? s.ranks[n] / s.users * 100 : 0}%;background:${r[3]}"></i></div><b style="min-width:28px;text-align:right">${s.ranks[n]}</b></div>`).join('')}</div>`;
 }
 
 /* ---------- Admin: kelola soal (unggah Excel + daftar soal) ---------- */
@@ -1146,7 +1152,7 @@ async function userDetail(id) {
   let d; try { d = await api('admin/user?id=' + id); } catch (e) { alert(e.message); return; }
   const b = d.best, tot = Object.values(b).reduce((a, x) => a + x, 0), ri = rkOf(tot), u = d.user;
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="box"><h2>${esc(u.username)}</h2><span class="tag" style="background:${RANKS[ri][3]};color:#1a1a1a">${RANKS[ri][2]} ${RANKS[ri][1]}</span>
+  m.innerHTML = `<div class="box"><h2>${esc(u.username)}</h2><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
     <p class="muted">${tot} XP · bergabung ${new Date(u.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
     ${[1, 2, 3, 4].map(j => `<div class="urow"><span class="tag" style="margin:0;background:${JC[j][0]};color:${JC[j][2]}">Jilid ${j}</span><span class="muted" style="margin:0;text-align:right;font-size:.88rem">${Object.entries(LV).map(([k, [nm, , x]]) => { const v = b[j + ':' + k] || 0; return nm + ' ' + v + '/' + x + (v >= x * PASS() / 100 ? ' ✅' : ''); }).join(' · ')}</span></div>`).join('')}
     <div class="urow"><b>📚 Tathbiq</b><span class="muted" style="margin:0">Rekor ${b['0:endless'] || 0} XP · tahap ${d.tstage ? STG[d.tstage - 1][0] : '-'}</span></div>
