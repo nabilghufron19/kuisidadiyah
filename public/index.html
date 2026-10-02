@@ -154,22 +154,56 @@ h2.cur::after{content:'▌';color:var(--accent);animation:blink .8s infinite}
 .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px}
 .modal .box{background:var(--surface);border-radius:22px;max-width:560px;width:100%;max-height:86vh;overflow:auto;padding:22px;animation:pop .3s}
 .gl{padding-left:20px;margin:0 0 8px}.gl li{margin-bottom:6px}
-/* ===== Efek foto profil (naik seiring pencapaian) ===== */
+/* ===== Efek foto profil (naik seiring pencapaian) =====
+   Jilid (1-4)      : cincin logam 3D berbevel + kilau yang menyapu (t1: fx1-2 · t2: fx3-4, + titik cahaya & kilau bergerak)
+   Tathbiq (5-10)   : cincin neon tebal menyala + gelombang energi + orbit miring 3D (1-3 orbit, melintas di depan & belakang foto)
+   Takhossus (11)   : emas, sinar berputar, 3 orbit, mahkota */
 @keyframes spin{to{transform:rotate(1turn)}}
 @keyframes aura{0%,100%{box-shadow:0 0 calc(var(--t)*2) 0 var(--c1)}50%{box-shadow:0 0 calc(var(--t)*4.5) calc(var(--t)*.6) var(--c1)}}
 @keyframes bob{50%{transform:translateX(-50%) translateY(-3px) rotate(-10deg)}}
+@keyframes sheen{0%{background-position:160% 0,0 0}55%,100%{background-position:-60% 0,0 0}}
+@keyframes wave{0%{transform:scale(1);opacity:.9}100%{transform:scale(2);opacity:0}}
+@keyframes blazeA{0%,100%{box-shadow:0 0 calc(var(--t)*2.5) calc(var(--t)*.4) var(--c1),0 0 calc(var(--t)*6) calc(var(--t)*.6) var(--c2)}30%{box-shadow:0 0 calc(var(--t)*3.5) calc(var(--t)*.9) var(--hi),0 0 calc(var(--t)*9) calc(var(--t)*1.8) var(--c1)}55%{box-shadow:0 0 calc(var(--t)*2) calc(var(--t)*.3) var(--c1),0 0 calc(var(--t)*5) calc(var(--t)*.5) var(--c2)}75%{box-shadow:0 0 calc(var(--t)*4) calc(var(--t)*1) var(--hi),0 0 calc(var(--t)*10) calc(var(--t)*2) var(--c1)}}
+@keyframes breathe{0%,100%{filter:brightness(1) saturate(1)}50%{filter:brightness(1.4) saturate(1.25)}}
 .av.md{width:52px;height:52px;font-size:1.6rem}
-.avw{--sz:32px;--t:3px;position:relative;display:inline-grid;flex:none;border-radius:50%;isolation:isolate}
+.avw{--sz:32px;--t:3px;--k:1;--hi:#fff;--lo:#000;position:relative;display:inline-grid;flex:none;border-radius:50%;isolation:isolate}
 .avw.md{--sz:52px;--t:4px}.avw.lg{--sz:84px;--t:5px}
-.avw::before{content:'';position:absolute;inset:calc(var(--t)*-1);border-radius:50%;z-index:-1;background:var(--c1)}
-.avw.t2::before,.avw.t3::before,.avw.t4::before{background:conic-gradient(var(--c1),var(--c2),var(--c1));animation:spin 4s linear infinite}
-.avw.t2,.avw.t3,.avw.t4{animation:aura 2.4s ease-in-out infinite}
-.avw.fx4::before{background:conic-gradient(#C5DA2B,#2BA3E6,#A94BC0,#F5A31A,#C5DA2B)}
-.avw.t3::before{animation-duration:2.6s}.avw.t3{animation-duration:2s}
-.avw.t3::after,.avw.t4::after{content:'';position:absolute;inset:calc(var(--t)*-1);border-radius:50%;z-index:2;pointer-events:none;background:radial-gradient(circle at 50% calc(var(--t)*.5),#fff 0 calc(var(--t)*.5),transparent calc(var(--t)*.65));filter:drop-shadow(0 0 2px #fff);animation:spin 2.4s linear infinite}
-.avw.t4::before{background:conic-gradient(#FFF3B0,#F2B705,#B8860B,#F2B705,#FFF3B0);animation-duration:2s}
-.avw.t4{animation-duration:1.6s}
-.avw.t4::after{background:radial-gradient(circle at 50% calc(var(--t)*.5),#fff 0 calc(var(--t)*.5),transparent calc(var(--t)*.65)),radial-gradient(circle at 50% calc(100% - var(--t)*.5),#fff 0 calc(var(--t)*.5),transparent calc(var(--t)*.65));animation-duration:3s}
+/* foto: kubah kaca (bayangan dalam + kilau) */
+.avw>.av{position:relative;box-shadow:0 0 0 1px rgba(0,0,0,.45),inset 0 calc(var(--sz)*-.09) calc(var(--sz)*.16) rgba(0,0,0,.42),inset 0 calc(var(--sz)*.04) calc(var(--sz)*.08) rgba(255,255,255,.45)}
+.avw>.av::after{content:'';position:absolute;inset:0;border-radius:50%;pointer-events:none;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.6) 50%,transparent 62%) 160% 0/250% 100% no-repeat,radial-gradient(ellipse 70% 45% at 32% 18%,rgba(255,255,255,.5),transparent 70%) 0 0/100% 100% no-repeat}
+/* cincin: lapisan berputar (logam) + lapisan bevel yang diam (cahaya selalu dari atas) */
+.avw .rg{position:absolute;inset:calc(var(--t)*-1*var(--k));border-radius:50%;z-index:-1;pointer-events:none;background:conic-gradient(var(--hi),var(--c1) 22%,var(--lo) 50%,var(--c1) 78%,var(--hi));animation:spin 9s linear infinite}
+.avw::after{content:'';position:absolute;inset:calc(var(--t)*-1*var(--k));border-radius:50%;z-index:-1;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.65),inset 0 calc(var(--t)*-.7) calc(var(--t)*.9) rgba(0,0,0,.42),inset 0 calc(var(--t)*.5) calc(var(--t)*.6) rgba(255,255,255,.38),0 calc(var(--t)*.4) calc(var(--t)*.9) rgba(0,0,0,.5)}
+.avw.fx4 .rg{background:conic-gradient(#C5DA2B,#2BA3E6,#A94BC0,#F5A31A,#C5DA2B)}
+/* jilid */
+.avw.t1{--k:1.1;animation:aura 3.2s ease-in-out infinite}
+.avw.t2{--k:1.3;animation:aura 2.2s ease-in-out infinite}
+.avw.t2 .rg{animation-duration:5s}
+.avw.t2>.av::after{animation:sheen 3.2s ease-in-out infinite}
+/* titik cahaya yang berlari di cincin */
+.avw.t2 .rg::after,.avw.t3 .rg::after,.avw.t4 .rg::after{content:'';position:absolute;left:50%;top:calc(var(--t)*var(--k)*.5);width:calc(var(--t)*1.4);height:calc(var(--t)*1.4);margin:calc(var(--t)*-.7) 0 0 calc(var(--t)*-.7);border-radius:50%;background:#fff;box-shadow:0 0 calc(var(--t)*1.2) calc(var(--t)*.4) #fff,0 0 calc(var(--t)*2.6) var(--t) var(--c1)}
+/* tathbiq: neon menyala */
+.avw.t3{--k:1.6;animation:blazeA 1.3s ease-in-out infinite}
+.avw.t3 .rg{animation:spin 1.7s linear infinite,breathe 1.1s ease-in-out infinite;background:conic-gradient(var(--hi),var(--c1) 22%,var(--lo) 46%,var(--c2) 72%,var(--hi) 90%,var(--hi))}
+.avw.t3>.av::after{animation:sheen 1.8s ease-in-out infinite}
+.avw.t3::before,.avw.t4::before{content:'';position:absolute;inset:calc(var(--t)*-1*var(--k));border-radius:50%;border:max(1.5px,calc(var(--t)*.5)) solid var(--c1);z-index:-2;pointer-events:none;animation:wave 1.8s ease-out infinite}
+/* takhossus: emas */
+.avw.t4{--k:1.8;animation:blazeA 1.1s ease-in-out infinite}
+.avw.t4 .rg{animation:spin 1.3s linear infinite,breathe 1s ease-in-out infinite;background:conic-gradient(#fff,#FFF3B0 8%,#F2B705 24%,#8a5a00 48%,#F2B705 72%,#FFF3B0 92%,#fff)}
+.avw.t4>.av::after{animation:sheen 1.4s ease-in-out infinite}
+.avw .ray{position:absolute;inset:calc(var(--sz)*-.55);border-radius:50%;z-index:-2;pointer-events:none;background:repeating-conic-gradient(rgba(255,226,120,.8) 0 5deg,transparent 5deg 15deg);-webkit-mask:radial-gradient(closest-side,transparent 48%,#000 58%,transparent 100%);mask:radial-gradient(closest-side,transparent 48%,#000 58%,transparent 100%);animation:spin 14s linear infinite}
+/* orbit miring 3D: setengah belakang di balik foto, setengah depan melintas di atas foto */
+.ob{--w:max(1.5px,calc(var(--sz)*.04));--d:max(4px,calc(var(--sz)*.11));--rz:0deg;--sp:2.4s;position:absolute;inset:calc(var(--sz)*-.32);border-radius:50%;pointer-events:none;transform:rotate(var(--rz)) perspective(calc(var(--sz)*6)) rotateX(72deg)}
+.ob.bk{z-index:-1;clip-path:inset(-80% -80% 50% -80%)}
+.ob.ft{z-index:3;clip-path:inset(50% -80% -80% -80%)}
+.ob::before{content:'';position:absolute;inset:0;border-radius:50%;border:1px solid var(--c1);opacity:.3}
+.od{position:absolute;inset:0;animation:spin var(--sp) linear infinite}
+.od::before{content:'';position:absolute;inset:0;border-radius:50%;background:conic-gradient(transparent 0 50%,var(--c1) 100%);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - var(--w)),#000 calc(100% - var(--w) + .5px));mask:radial-gradient(farthest-side,transparent calc(100% - var(--w)),#000 calc(100% - var(--w) + .5px))}
+.od::after{content:'';position:absolute;left:50%;top:0;width:var(--d);height:var(--d);margin:calc(var(--d)*-.5) 0 0 calc(var(--d)*-.5);border-radius:50%;background:#fff;box-shadow:0 0 calc(var(--d)*.9) calc(var(--d)*.3) #fff,0 0 calc(var(--d)*2) calc(var(--d)*.7) var(--c1),0 0 calc(var(--d)*4) var(--d) var(--c1)}
+.ob.p1{--rz:-18deg;--sp:2.2s}
+.ob.p2{--rz:50deg;--sp:3s;--c1:var(--c2)}.ob.p2 .od{animation-direction:reverse}
+.ob.p3{--rz:-64deg;--sp:3.9s;inset:calc(var(--sz)*-.4)}
+.avw.t4 .ob.p2{--c1:#fff3b0}
 .crn{position:absolute;left:50%;top:calc(var(--sz)*-.4);transform:translateX(-50%) rotate(-10deg);font-style:normal;font-size:calc(var(--sz)*.46);line-height:1;z-index:3;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));animation:bob 2s ease-in-out infinite}
 .fxg{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
 .fxi{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:22px 8px 12px;border-radius:16px;border:1px solid var(--line);background:var(--bg);opacity:.5}
@@ -232,6 +266,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .lpz,.lpz *,.lpz *::before,.lpz *::after{animation-play-state:paused!important}
 .lite .avw.t2,.lite .avw.t3,.lite .avw.t4,.lite .fire{animation:none!important;box-shadow:0 0 calc(var(--t,4px)*3) 0 var(--c1,#ff6a00)}
 .lite .fl{animation:none}
+.lite .avw::before,.lite .avw .ray,.lite .ob.p2,.lite .ob.p3,.lite .avw>.av::after{display:none!important}.lite .avw{animation:none!important;box-shadow:0 0 calc(var(--t)*3) 0 var(--c1)}.lite .avw .rg{animation:spin 6s linear infinite!important}
 /* ===== Beranda (dirapikan) ===== */
 .hello{margin:0 0 14px}
 .hero{padding:22px;margin-bottom:26px;border-top:5px solid var(--rc)}
@@ -911,12 +946,17 @@ function vEndResult(r) {
 const AVS = [['🦁', '#F5A31A'], ['🦅', '#2BA3E6'], ['🐪', '#D2A15B'], ['🐢', '#2EAD5C'], ['🦉', '#A94BC0'], ['🐬', '#3AA9F0'], ['🦊', '#EF7B3B'], ['🐼', '#9AA5B1'], ['🌙', '#4B4FB3'], ['📖', '#1A7A3C'], ['🕌', '#46C2B5'], ['⭐', '#F2B705']];
 /* Efek foto: level efek = jumlah pencapaian (0-11). Tier 1: cincin (1-3) · 2: cincin berputar + cahaya (4-6) · 3: + titik mengorbit (7-10) · 4: emas + mahkota (11, Takhossus) */
 const FXC = [['#2EAD5C', '#2EAD5C'], ['#2BA3E6', '#2BA3E6'], ['#A94BC0', '#A94BC0'], ['#F5A31A', '#C5DA2B'], ['#22A052', '#7CFFA8'], ['#2B8FE0', '#7CD3FF'], ['#A44FD0', '#E0A0FF'], ['#F08A1E', '#FFD27A'], ['#E24B3B', '#FF9A8A'], ['#E0367A', '#FF8FC0'], ['#F2B705', '#FFF3B0']];
-const fxTier = n => n < 4 ? 1 : n < 7 ? 2 : n < 11 ? 3 : 4;
+const fxTier = n => n <= 2 ? 1 : n <= 4 ? 2 : n <= 10 ? 3 : 4; // 1-2 jilid biasa · 3-4 jilid tinggi · 5-10 Tathbiq · 11 Takhossus
+const mixHex = (h, to, p) => { const n = parseInt(h.slice(1), 16); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v + (to - v) * p).toString(16).padStart(2, '0')).join(''); };
 const avBase = (k, sz = '', fx = 0) => {
   const a = AVS[(parseInt(String(k || 'a1').slice(1)) - 1) || 0], e = `<span class="av ${sz}" style="background:${a[1]}">${a[0]}</span>`;
   if (!(fx > 0)) return e;
-  const n = Math.min(fx, 11), f = FXC[n - 1];
-  return `<span class="avw ${sz} t${fxTier(n)} fx${n}" style="--c1:${f[0]};--c2:${f[1]}">${e}${n === 11 ? '<i class="crn">👑</i>' : ''}</span>`;
+  const n = Math.min(fx, 11), f = FXC[n - 1], t = fxTier(n);
+  // Tathbiq: 1 orbit (5-6), 2 orbit (7-8), 3 orbit (9-11). Ukuran kecil (daftar/leaderboard) cukup 1 orbit supaya ringan.
+  const orb = t < 3 ? 0 : sz ? (n >= 9 ? 3 : n >= 7 ? 2 : 1) : 1;
+  let ob = ''; for (let i = 1; i <= orb; i++) ob += `<i class="ob bk p${i}"><i class="od"></i></i><i class="ob ft p${i}"><i class="od"></i></i>`;
+  const hi = mixHex(f[0], 255, t >= 3 ? .6 : .5), lo = mixHex(f[0], 0, .5);
+  return `<span class="avw ${sz} t${t} fx${n}" style="--c1:${f[0]};--c2:${f[1]};--hi:${hi};--lo:${lo}"><i class="rg"></i>${e}${ob}${n === 11 && sz ? '<i class="ray"></i>' : ''}${n === 11 ? '<i class="crn">👑</i>' : ''}</span>`;
 };
 /* top = 1: api · 2: petir · 3: percikan aura (juara leaderboard). true dianggap 1 (kompatibel dengan pemanggilan lama). */
 const TOPFX = { 1: ['fire', '🔥'], 2: ['zap', '⚡'], 3: ['spk', '✨'] };
