@@ -385,7 +385,7 @@ export async function onRequest({ request, env, params }) {
     if (u.role !== 'admin') return bad('Khusus admin', 403);
 
     if (route === 'GET admin/stats') {
-      // statistik hanya menghitung murid (bukan admin). Batas rank harus sama dengan RANKS di index.html: 300/700/1200/1800.
+      // statistik hanya menghitung murid (bukan admin). Batas rank harus sama dengan RANKS di index.html: 300/700/1200/1800/3000 (Legend).
       const [q, [c], bj, [rk]] = await sql.transaction([
         sql`select jilid, count(*)::int n from questions group by jilid`,
         sql`select (select count(*) from users where role = 'student')::int users,
@@ -397,8 +397,8 @@ export async function onRequest({ request, env, params }) {
         sql`with best as (select user_id, max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts group by user_id, jilid, level),
           tot as (select u.id, coalesce(sum(b.xp), 0)::int t from users u left join best b on b.user_id = u.id where u.role = 'student' group by u.id)
           select count(*) filter (where t < 300)::int r0, count(*) filter (where t >= 300 and t < 700)::int r1, count(*) filter (where t >= 700 and t < 1200)::int r2,
-            count(*) filter (where t >= 1200 and t < 1800)::int r3, count(*) filter (where t >= 1800)::int r4 from tot`]);
-      return J({ q: Object.fromEntries(q.map(r => [r.jilid, r.n])), ...c, byJilid: Object.fromEntries(bj.map(r => [r.jilid, r])), ranks: [rk.r0, rk.r1, rk.r2, rk.r3, rk.r4] });
+            count(*) filter (where t >= 1200 and t < 1800)::int r3, count(*) filter (where t >= 1800 and t < 3000)::int r4, count(*) filter (where t >= 3000)::int r5 from tot`]);
+      return J({ q: Object.fromEntries(q.map(r => [r.jilid, r.n])), ...c, byJilid: Object.fromEntries(bj.map(r => [r.jilid, r])), ranks: [rk.r0, rk.r1, rk.r2, rk.r3, rk.r4, rk.r5] });
     }
 
     if (route === 'POST admin/questions') {
