@@ -96,19 +96,19 @@ export async function onRequest({ request, env, params }) {
     const uid = claim && claim.k === 'auth' ? +claim.uid : 0;
     if (!uid) return bad('Silakan masuk dulu', 401);
     let cachedUser;
-    const getUser = async () => cachedUser ||= (await sql`select id, username, role, avatar, fx from users where id = ${uid}`)[0] || null;
+    const getUser = async () => cachedUser ||= (await sql`select id, username, role, avatar, fx, on_board from users where id = ${uid}`)[0] || null;
 
     if (route === 'GET me') {
       // satu round trip untuk tiga query
       const [[usr], best, [t], [sp], [bn]] = await sql.transaction([
-        sql`select username, role, avatar, fx, fxa from users where id = ${uid}`,
+        sql`select username, role, avatar, fx, fxa, on_board from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
         sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
         sql`select coalesce(sum(prize), 0)::int s from daily where user_id = ${uid} and spun`]);
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
-      return J({ username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -234,16 +234,18 @@ export async function onRequest({ request, env, params }) {
         if (!Number.isInteger(n) || n < 0 || n > 11) return bad('Efek tidak valid');
         fx = n;
       }
+      // hanya admin yang boleh memilih tampil/tidak di leaderboard; murid selalu tampil
+      const ob = u.role === 'admin' && typeof body.board === 'boolean' ? body.board : u.on_board;
       const needFx = fx > 0 && u.role !== 'admin' && fx !== u.fx; // admin bebas; efek yang sudah dipakai tak perlu dicek ulang
       const qs = [sql`select 1 from users where lower(username) = lower(${un}) and id <> ${u.id} limit 1`];
       if (needFx) qs.push(bestOf(u.id), sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${u.id}`);
       const [dup, best, st] = await sql.transaction(qs);
       if (dup.length) return bad('Username sudah dipakai', 409);
       if (needFx && fx > jilidDone(best).filter(Boolean).length + st[0].s) return bad('Efek ini belum terbuka', 403);
-      try { await sql`update users set username = ${un}, avatar = ${av}, fx = ${fx} where id = ${u.id}`; }
+      try { await sql`update users set username = ${un}, avatar = ${av}, fx = ${fx}, on_board = ${ob} where id = ${u.id}`; }
       catch (e) { if (e.code === '23505') return bad('Username sudah dipakai', 409); throw e; }
       LB.clear();
-      return J({ username: un, avatar: av, fx });
+      return J({ username: un, avatar: av, fx, board: ob });
     }
 
     // ---------- Toko ----------
@@ -336,7 +338,7 @@ export async function onRequest({ request, env, params }) {
         ranked as (
           select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick,
                  sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
-          from best join users u on u.id = best.user_id group by u.id, u.username, u.avatar, u.role, u.fx)
+          from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
         order by rank, username limit 100`;
@@ -355,6 +357,26 @@ export async function onRequest({ request, env, params }) {
       if (LB.size > 60) LB.clear();
       LB.set(ck, { t: Date.now() + LB_TTL, v: out });
       return J(out);
+    }
+
+    // ---------- Profil pemain (dibuka dari leaderboard) ----------
+    // Hanya data publik: XP, pencapaian, efek foto, dan koleksi item. Gold, riwayat percobaan, dan data akun TIDAK dikirim.
+    if (route === 'GET player') {
+      const un = (url.searchParams.get('u') || '').trim().slice(0, 30);
+      const [t] = un ? await sql`select id, username, role, avatar, fx, fxa, on_board, created_at from users where lower(username) = lower(${un})` : [];
+      if (!t || (t.role === 'admin' && !t.on_board)) return bad('Pemain tidak ditemukan', 404);
+      const [best, [en], own] = await sql.transaction([
+        bestOf(t.id),
+        sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int s from endless_runs where user_id = ${t.id}`,
+        sql`select item from purchases where user_id = ${t.id}`]);
+      const admin = t.role === 'admin', ach = admin ? [true, true, true, true] : jilidDone(best);
+      const mx = admin ? 11 : ach.filter(Boolean).length + en.s;
+      return J({
+        username: t.username, admin, avatar: t.avatar, since: t.created_at,
+        fx: t.fx == null ? mx : Math.min(t.fx, mx),
+        total: best.reduce((a, r) => a + r.xp, 0), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])),
+        ach, tstage: admin ? 7 : en.s, owned: admin ? Object.keys(SHOP) : own.map(r => r.item), equipped: t.fxa
+      });
     }
 
     // ---------- Khusus admin ----------
