@@ -427,6 +427,22 @@ export async function onRequest({ request, env, params }) {
       return J({ rows, total: n });
     }
 
+    // Unduh seluruh bank soal (format kolom sama dengan template unggah, jadi bisa dipakai sebagai backup/restore).
+    if (route === 'GET admin/questions-export') {
+      const rows = await sql`select jilid, q, a, b, c, d, answer from questions order by jilid, id`;
+      return J({ rows });
+    }
+
+    // Hapus SELURUH bank soal. Wajib kirim confirm: 'HAPUS' supaya tidak terpicu tanpa sengaja.
+    // Data murid (attempts, XP, gold, daily, purchases) tidak disentuh; sesi yang sedang berjalan melewati soal yang sudah hilang.
+    if (route === 'POST admin/questions-clear') {
+      if (body.confirm !== 'HAPUS') return bad('Konfirmasi tidak valid');
+      let n;
+      try { [{ n }] = await sql`with d as (delete from questions returning 1) select count(*)::int n from d`; }
+      catch (e) { if (e.code === '23503') return bad('Soal masih terhubung ke data lain', 409); throw e; }
+      return J({ deleted: n });
+    }
+
     if (route === 'POST admin/question-save') {
       const id = +body.id || 0, j = +body.jilid, f = ['q', 'a', 'b', 'c', 'd'].map(k => String(body[k] ?? '').trim()), ans = String(body.answer || '').toUpperCase();
       if (![1, 2, 3, 4].includes(j) || f.some(x => !x) || !/^[ABCD]$/.test(ans)) return bad('Jilid 1–4, semua kolom terisi, jawaban A–D');
