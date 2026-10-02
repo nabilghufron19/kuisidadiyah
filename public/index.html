@@ -1192,6 +1192,7 @@ function adminQuestions() {
     <div class="tabs">${['Semua', 1, 2, 3, 4].map((x, n) => `<button data-qj="${n}" class="${n === qmJ ? 'on' : ''}">${n ? 'Jilid ' + x : x}</button>`).join('')}</div>
     <input type="search" id="qmq" placeholder="Cari isi pertanyaan…" value="${esc(qmQ)}" autocomplete="off">
     <div class="row" style="margin:0 0 12px"><button class="btn" id="qmAdd">+ Tambah soal</button><button class="btn ghost del" id="qmDel" disabled>Hapus terpilih</button></div>
+    <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="qmExp">⬇️ Unduh semua soal</button><button class="btn ghost del" id="qmAll">🗑️ Hapus semua soal</button></div>
     <div id="qml" class="muted">Memuat…</div></div>`);
   let t, seq = 0, rows = [];
   const sel = () => [...$('#qml').querySelectorAll('input[type=checkbox]:checked')].map(x => +x.dataset.id);
@@ -1222,6 +1223,43 @@ function adminQuestions() {
     const ids = sel(); if (!ids.length) return;
     if (!confirm(`Hapus ${ids.length} soal terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
     try { await api('admin/question-delete', { ids }); toast(ids.length + ' soal dihapus', '🗑️'); load(); refreshStats(); } catch (e) { alert(e.message); }
+  };
+  $('#qmExp').onclick = async e => {
+    const b = e.currentTarget, t0 = b.textContent; b.disabled = true; b.textContent = 'Menyiapkan…';
+    try {
+      const [d] = await Promise.all([api('admin/questions-export'), loadX()]);
+      if (!d.rows.length) { alert('Bank soal masih kosong.'); return; }
+      const ws = XLSX.utils.json_to_sheet(d.rows.map(r => ({ jilid: r.jilid, pertanyaan: r.q, A: r.a, B: r.b, C: r.c, D: r.d, jawaban: r.answer })), { header: ['jilid', 'pertanyaan', 'A', 'B', 'C', 'D', 'jawaban'] });
+      ws['!cols'] = [{ wch: 6 }, { wch: 60 }, { wch: 28 }, { wch: 28 }, { wch: 28 }, { wch: 28 }, { wch: 8 }];
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Soal');
+      XLSX.writeFile(wb, 'bank-soal-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+      toast(d.rows.length + ' soal diunduh', '⬇️');
+    } catch (x) { alert(x.message); }
+    finally { b.disabled = false; b.textContent = t0; }
+  };
+  $('#qmAll').onclick = async () => {
+    let total = 0; try { total = (await api('admin/questions?jilid=0&q=&offset=0')).total; } catch (e) { alert(e.message); return; }
+    if (!total) { alert('Bank soal sudah kosong.'); return; }
+    const m = document.createElement('div'); m.className = 'modal';
+    m.innerHTML = `<div class="box"><h2>Hapus semua soal?</h2>
+      <p>Seluruh <b>${total} soal</b> (Jilid 1–4) akan dihapus permanen. Data murid (XP, rank, gold) tidak ikut terhapus, tetapi kuis, Tathbiq, dan kuis harian tidak bisa dimainkan sampai soal diunggah lagi.</p>
+      <p class="muted">Disarankan unduh cadangan dulu.</p>
+      <input id="cfm" placeholder="Ketik HAPUS untuk melanjutkan" autocomplete="off">
+      <div class="err" id="cfe"></div>
+      <div class="row"><button class="btn ghost" id="cfx">Batal</button><button class="btn ghost" id="cfd">Unduh cadangan</button><button class="btn" id="cfy" disabled>Hapus semua</button></div></div>`;
+    document.body.appendChild(m);
+    const close = () => m.remove(), ok = m.querySelector('#cfy'), inp = m.querySelector('#cfm');
+    m.querySelector('#cfx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+    m.querySelector('#cfd').onclick = () => $('#qmExp').click();
+    inp.oninput = () => { ok.disabled = inp.value.trim() !== 'HAPUS'; };
+    ok.onclick = async () => {
+      ok.disabled = true;
+      try {
+        const r = await api('admin/questions-clear', { confirm: 'HAPUS' });
+        close(); qmOff = 0; toast(r.deleted + ' soal dihapus', '🗑️'); load(); refreshStats();
+      } catch (e) { m.querySelector('#cfe').textContent = e.message; ok.disabled = false; }
+    };
+    inp.focus();
   };
   load();
 }
