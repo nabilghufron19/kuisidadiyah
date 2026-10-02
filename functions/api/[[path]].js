@@ -8,6 +8,9 @@ const bad = (m, s = 400) => J({ error: m }, s);
 // Toko: harga efek jawaban benar (gold). 'confetti' bawaan dan gratis. Gold = XP rekor x GOLD_RATE, dikurangi total belanja.
 const GOLD_RATE = 1;
 const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600, fire: 900, ice: 1100, lightning: 1500, comet: 2000, galaxy: 2800 };
+// Toko: gaya nama di leaderboard (kunci diawali n_). Disimpan di purchases seperti efek jawaban; yang terpasang ada di users.fxn.
+const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimmer: 600, n_neon: 800, n_blaze: 1100, n_frost: 1300, n_glitch: 2000, n_rainbow: 2500 };
+const PRICES = { ...SHOP, ...NSHOP };
 // Kuis harian: 10 soal acak semua jilid; nilai >= DAILY_PASS memberi 1 spin. Hadiah = [gold, bobot]. Spin ke-PITY sejak hadiah >= RARE terakhir dijamin langka.
 const DAILY_N = 10, DAILY_PASS = 80, RARE = 300, PITY = 10;
 const PRIZES = [[100, 49], [150, 24], [200, 12], [300, 8], [500, 4], [750, 2], [1000, 1]]; // hadiah minimal 100 gold
@@ -101,14 +104,14 @@ export async function onRequest({ request, env, params }) {
     if (route === 'GET me') {
       // satu round trip untuk tiga query
       const [[usr], best, [t], [sp], [bn]] = await sql.transaction([
-        sql`select username, role, avatar, fx, fxa, on_board from users where id = ${uid}`,
+        sql`select username, role, avatar, fx, fxa, fxn, on_board from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
         sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
-        sql`select coalesce(sum(prize), 0)::int s from daily where user_id = ${uid} and spun`]);
+        sql`select gold_bonus(${uid}::int) s`]);
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
-      return J({ username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -250,33 +253,41 @@ export async function onRequest({ request, env, params }) {
 
     // ---------- Toko ----------
     const shopState = async () => {
-      const [best, own, [u], [bn]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, role from users where id = ${uid}`, sql`select coalesce(sum(prize), 0)::int s from daily where user_id = ${uid} and spun`]);
+      const [best, own, [u], [bn]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_bonus(${uid}::int) s`]);
       const earned = best.reduce((a, r) => a + r.xp, 0) * GOLD_RATE, spent = own.reduce((a, r) => a + r.price, 0), admin = !!u && u.role === 'admin';
-      return { gold: earned + bn.s - spent, earned, bonus: bn.s, spent, admin, owned: admin ? Object.keys(SHOP) : own.map(r => r.item), equipped: u ? u.fxa : null, prices: SHOP };
+      return { gold: earned + bn.s - spent, earned, bonus: bn.s, spent, admin, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: u ? u.fxa : null, equippedName: u ? u.fxn : null, prices: PRICES };
     };
     if (route === 'GET shop') return J(await shopState());
     if (route === 'POST shop/buy') {
       const item = String(body.item || '');
-      if (!Object.hasOwn(SHOP, item)) return bad('Item tidak ditemukan', 404);
-      const price = SHOP[item];
+      if (!Object.hasOwn(PRICES, item)) return bad('Item tidak ditemukan', 404);
+      const price = PRICES[item];
       // kunci per pengguna: dua pembelian bersamaan tidak bisa melewati saldo
       const [, ins] = await sql.transaction([
         sql`select pg_advisory_xact_lock(${uid}::int)`,
         sql`with best as (select max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts where user_id = ${uid} group by jilid, level),
-            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce((select sum(prize) from daily where user_id = ${uid} and spun), 0) - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
+            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce(gold_bonus(${uid}::int), 0) - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
           insert into purchases (user_id, item, price) select ${uid}::int, ${item}::text, ${price}::int from bal where g >= ${price}::int on conflict do nothing returning item`]);
       if (!ins.length) {
         const [own] = await sql`select 1 from purchases where user_id = ${uid} and item = ${item}`;
-        return own ? bad('Efek ini sudah kamu miliki', 409) : bad('Gold belum cukup', 402);
+        return own ? bad('Item ini sudah kamu miliki', 409) : bad('Gold belum cukup', 402);
       }
       return J(await shopState());
     }
     if (route === 'POST shop/equip') {
       const item = String(body.item || 'confetti');
-      if (item !== 'confetti' && !Object.hasOwn(SHOP, item)) return bad('Item tidak ditemukan', 404);
+      if (item === 'n_none') { // lepas gaya nama
+        await sql`update users set fxn = null where id = ${uid}`; LB.clear();
+        return J(await shopState());
+      }
+      if (item !== 'confetti' && !Object.hasOwn(PRICES, item)) return bad('Item tidak ditemukan', 404);
       const st = await shopState();
-      if (item !== 'confetti' && !st.owned.includes(item)) return bad('Beli dulu efek ini', 403);
-      const fx = item === 'confetti' ? null : item;
+      if (item !== 'confetti' && !st.owned.includes(item)) return bad('Beli dulu item ini', 403);
+      if (item.startsWith('n_')) { // gaya nama -> users.fxn
+        await sql`update users set fxn = ${item} where id = ${uid}`; LB.clear();
+        return J({ ...st, equippedName: item });
+      }
+      const fx = item === 'confetti' ? null : item; // efek jawaban benar -> users.fxa
       await sql`update users set fxa = ${fx} where id = ${uid}`;
       return J({ ...st, equipped: fx });
     }
@@ -336,9 +347,9 @@ export async function onRequest({ request, env, params }) {
                  max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp
           from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
-          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick,
+          select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick, u.fxn as nm,
                  sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
-          from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx)
+          from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx, u.fxn)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
         order by rank, username limit 100`;
@@ -363,7 +374,7 @@ export async function onRequest({ request, env, params }) {
     // Hanya data publik: XP, pencapaian, efek foto, dan koleksi item. Gold, riwayat percobaan, dan data akun TIDAK dikirim.
     if (route === 'GET player') {
       const un = (url.searchParams.get('u') || '').trim().slice(0, 30);
-      const [t] = un ? await sql`select id, username, role, avatar, fx, fxa, on_board, created_at from users where lower(username) = lower(${un})` : [];
+      const [t] = un ? await sql`select id, username, role, avatar, fx, fxa, fxn, on_board, created_at from users where lower(username) = lower(${un})` : [];
       if (!t || (t.role === 'admin' && !t.on_board)) return bad('Pemain tidak ditemukan', 404);
       const [best, [en], own] = await sql.transaction([
         bestOf(t.id),
@@ -375,7 +386,7 @@ export async function onRequest({ request, env, params }) {
         username: t.username, admin, avatar: t.avatar, since: t.created_at,
         fx: t.fx == null ? mx : Math.min(t.fx, mx),
         total: best.reduce((a, r) => a + r.xp, 0), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])),
-        ach, tstage: admin ? 7 : en.s, owned: admin ? Object.keys(SHOP) : own.map(r => r.item), equipped: t.fxa
+        ach, tstage: admin ? 7 : en.s, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: t.fxa, nm: t.fxn
       });
     }
 
