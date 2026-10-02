@@ -184,7 +184,7 @@ button.fxi{font:inherit;color:inherit;cursor:pointer;width:100%}button.fxi:disab
 .fl{position:absolute;font-style:normal;line-height:1;font-size:calc(var(--sz)*.62);z-index:-1;pointer-events:none;transform-origin:50% 90%;filter:drop-shadow(0 0 4px #ff6a00);animation:flick .7s ease-in-out infinite}
 .fl.f1{left:-14%;top:-26%;animation-delay:-.2s}.fl.f2{left:50%;top:-44%;margin-left:calc(var(--sz)*-.31);animation-delay:-.45s}.fl.f3{right:-14%;top:-26%;animation-delay:-.1s}
 .lrow.top1{background:linear-gradient(90deg,rgba(255,110,0,.24),rgba(255,190,0,.08));border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,120,0,.5)}
-.lrow.top1 .un>span:last-child{background:linear-gradient(90deg,#ff3d00,#ffb300,#ff3d00);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;animation:flametxt 2s linear infinite}
+.lrow.top1:not(.hasnm) .un>span:last-child{background:linear-gradient(90deg,#ff3d00,#ffb300,#ff3d00);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;animation:flametxt 2s linear infinite}
 /* ===== Nilai quest & kelola soal ===== */
 select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;width:100%;margin-bottom:10px}textarea{resize:vertical}
 .lvl .gr{font-weight:800}
@@ -210,9 +210,9 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .lrow{cursor:pointer}.lrow:hover{filter:brightness(.97)}
 .lrow.top2{background:linear-gradient(90deg,rgba(41,150,255,.22),rgba(120,220,255,.07));border-radius:12px;box-shadow:inset 0 0 0 1px rgba(60,170,255,.5)}
 .lrow.top3{background:linear-gradient(90deg,rgba(190,100,255,.22),rgba(255,150,230,.07));border-radius:12px;box-shadow:inset 0 0 0 1px rgba(200,110,255,.5)}
-.lrow.top2 .un>span:last-child,.lrow.top3 .un>span:last-child{background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;animation:flametxt 2.4s linear infinite}
-.lrow.top2 .un>span:last-child{background-image:linear-gradient(90deg,#1e90ff,#9be7ff,#1e90ff)}
-.lrow.top3 .un>span:last-child{background-image:linear-gradient(90deg,#a84bff,#ff9ae6,#a84bff)}
+.lrow.top2:not(.hasnm) .un>span:last-child,.lrow.top3:not(.hasnm) .un>span:last-child{background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;animation:flametxt 2.4s linear infinite}
+.lrow.top2:not(.hasnm) .un>span:last-child{background-image:linear-gradient(90deg,#1e90ff,#9be7ff,#1e90ff)}
+.lrow.top3:not(.hasnm) .un>span:last-child{background-image:linear-gradient(90deg,#a84bff,#ff9ae6,#a84bff)}
 .lite .zap,.lite .spk{animation:none!important;box-shadow:0 0 12px 0 var(--gc,#29b6ff)}.lite .spk{--gc:#c77dff}
 .lite .zap .fl,.lite .spk .fl{animation:none;opacity:1}
 /* ===== Profil pemain (modal dari leaderboard) ===== */
@@ -290,6 +290,25 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .si .tg{align-self:flex-start;font-size:.72rem;font-weight:800;padding:1px 10px;border-radius:999px;background:var(--tc);color:#fff}
 .si h3{margin:0}.si p{margin:0;color:var(--muted);font-size:.88rem;flex:1}
 .si .acts{display:flex;gap:8px}.si .acts .btn{flex:1;padding:10px 6px;font-size:.9rem}
+/* ===== Gaya nama (Toko) — dipakai di leaderboard, profil pemain, chip sidebar ===== */
+@keyframes nflow{to{background-position:200% 0}}
+@keyframes nneon{0%,100%{text-shadow:0 0 4px #7df9ff,0 0 10px #00d4ff}50%{text-shadow:0 0 8px #d6fdff,0 0 20px #00d4ff,0 0 32px #0099ff}}
+@keyframes nglitch{0%,84%,100%{transform:translate(0);text-shadow:-1px 0 #ff2d6f,1px 0 #00e5ff}88%{transform:translate(-2px,1px);text-shadow:-3px 0 #ff2d6f,3px 0 #00e5ff}92%{transform:translate(2px,-1px);text-shadow:3px 0 #ff2d6f,-3px 0 #00e5ff}96%{transform:translate(-1px,0);text-shadow:-2px 0 #ff2d6f,2px 0 #00e5ff}}
+.nfx{font-weight:800}
+.nfx.n_mint{color:#1fb865}
+.nfx.n_ocean{color:#2b9bff}
+.nfx.n_grape,.nfx.n_sunset,.nfx.n_shimmer,.nfx.n_blaze,.nfx.n_frost,.nfx.n_rainbow{-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;background-size:200% 100%}
+.nfx.n_grape{background-image:linear-gradient(90deg,#8e44ff,#ff5fd2,#8e44ff)}
+.nfx.n_sunset{background-image:linear-gradient(90deg,#ff8a00,#ff2d6f,#ff8a00)}
+.nfx.n_shimmer{background-image:linear-gradient(100deg,#b47a00 0 35%,#ffd34d 46%,#fff0a6 50%,#ffd34d 54%,#b47a00 65% 100%);animation:nflow 2.6s linear infinite;filter:drop-shadow(0 0 1px rgba(110,70,0,.75))}
+.nfx.n_neon{color:#c8fbff;background:#06222e;padding:1px 10px;border-radius:999px;animation:nneon 1.6s ease-in-out infinite}
+.nfx.n_blaze{background-image:linear-gradient(90deg,#ff3d00,#ffb300,#ff3d00);animation:nflow 1.6s linear infinite;filter:drop-shadow(0 0 3px rgba(255,100,0,.65))}
+.nfx.n_frost{background-image:linear-gradient(90deg,#1565c0,#4db3ff,#1565c0);animation:nflow 3s linear infinite;filter:drop-shadow(0 0 3px rgba(70,170,255,.75))}
+.nfx.n_glitch{display:inline-block;animation:nglitch 2.4s steps(1,end) infinite}
+.nfx.n_rainbow{background-image:linear-gradient(90deg,#ff3b3b,#ff9d00,#e8d000,#2ee66b,#2bb3ff,#8a4bff,#ff3bd1,#ff3b3b);animation:nflow 3.2s linear infinite}
+.lite .nfx{animation:none!important}
+.si .stage.nm{font-size:1.5rem;padding:0 10px;text-align:center;overflow:hidden;overflow-wrap:anywhere}.si .stage.nm b{line-height:1.3}
+.shopnote{margin:0 0 12px}
 .si.eq{box-shadow:inset 0 0 0 2px var(--accent)}
 .si.hi{animation:shim 2.4s ease-in-out infinite}
 .si .stage{perspective:420px}.si .stage span{display:inline-block;animation:flip3 5s linear infinite;filter:drop-shadow(0 8px 10px rgba(0,0,0,.35))}
@@ -624,31 +643,52 @@ const SHOP = [
   ['comet', 'Komet', '☄️', 'Legendaris', 'Komet jatuh dan menghantam jawabanmu.'],
   ['galaxy', 'Galaksi', '🌌', 'Mitos', 'Cincin galaksi berputar dan bintang berpusar.'],
 ];
+const NSHOP = [ // gaya nama: [kunci, nama, ikon(tak dipakai), tier, deskripsi]; harga ada di server
+  ['n_none', 'Polos', '', 'Umum', 'Warna teks bawaan, tanpa efek.'],
+  ['n_mint', 'Zamrud', '', 'Umum', 'Hijau zamrud yang segar dan tegas.'],
+  ['n_ocean', 'Samudra', '', 'Umum', 'Biru samudra yang cerah.'],
+  ['n_grape', 'Anggur', '', 'Langka', 'Gradien ungu ke merah muda.'],
+  ['n_sunset', 'Senja', '', 'Langka', 'Gradien jingga senja yang bergerak.'],
+  ['n_shimmer', 'Kilau Emas', '', 'Epik', 'Emas dengan kilau yang menyapu huruf.'],
+  ['n_neon', 'Neon', '', 'Epik', 'Papan neon menyala dan berdenyut.'],
+  ['n_blaze', 'Api', '', 'Legendaris', 'Huruf menyala seperti api.'],
+  ['n_frost', 'Es Kristal', '', 'Legendaris', 'Biru es berkilau dengan pendar dingin.'],
+  ['n_glitch', 'Glitch', '', 'Mitos', 'Huruf bergetar dengan bayangan RGB.'],
+  ['n_rainbow', 'Pelangi', '', 'Mitos', 'Seluruh warna pelangi mengalir di namamu.'],
+];
+const NSTYLE = new Set(NSHOP.map(x => x[0]).filter(k => k !== 'n_none'));
+const nc = k => NSTYLE.has(k) ? 'nfx ' + k : ''; // kelas CSS gaya nama (kosong bila tidak valid)
+const nm = (name, k) => { const c = nc(k); return c ? `<span class="${c}">${esc(name)}</span>` : esc(name); };
 const TIER = { Umum: '#8A97A6', Langka: '#2BA3E6', Epik: '#A94BC0', Legendaris: '#E8960F', Mitos: '#EF3E7B' };
+let shopTab = 'fx';
 async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
-  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; };
+  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; };
   const play = k => { const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
   const draw = () => {
-    sync(); const g = st.gold;
+    sync(); const g = st.gold, nameTab = shopTab === 'nm', list = nameTab ? NSHOP : SHOP;
     V.innerHTML = `<div class="shopbar"><h1>Toko</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
-      <p class="muted">Gold didapat dari tiap level, sama seperti XP: setiap rekor baru menambah XP dan Gold sebanyak yang sama. Belanjakan untuk efek yang muncul saat jawabanmu benar. Membeli tidak mengurangi XP atau rankmu.${st.admin ? ' Sebagai admin, semua efek terbuka untukmu.' : ''}</p>
-      <div class="shopg">${SHOP.map(([k, nm, ic, tr, ds]) => {
-        const own = k === 'confetti' || st.owned.includes(k), eq = (st.equipped || 'confetti') === k, pr = st.prices[k] || 0;
-        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span><div class="stage" id="sg-${k}"><span>${ic}</span></div><h3>${nm}</h3><p>${ds}</p>
-          <div class="acts"><button class="btn ghost" data-try="${k}">Coba</button>${own
+      <div class="tabs"><button data-st="fx" class="${nameTab ? '' : 'on'}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button></div>
+      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold didapat dari tiap level, sama seperti XP: setiap rekor baru menambah XP dan Gold sebanyak yang sama. Belanjakan untuk efek yang muncul saat jawabanmu benar. '}Membeli tidak mengurangi XP atau rankmu.${st.admin ? ' Sebagai admin, semua item terbuka untukmu.' : ''}</p>
+      <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
+        const free = k === 'confetti' || k === 'n_none', own = free || st.owned.includes(k), pr = st.prices[k] || 0;
+        const eq = nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
+        const stage = nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
+        return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}</h3><p>${ds}</p>
+          <div class="acts">${nameTab ? '' : `<button class="btn ghost" data-try="${k}">Coba</button>`}${own
             ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? 'Terpasang ✓' : 'Pasang'}</button>`
             : `<button class="btn" data-buy="${k}"${g < pr ? ' disabled' : ''}>${g < pr ? 'Kurang ' + (pr - g) + ' ' + GL : GL + ' ' + pr}</button>`}</div></div>`;
       }).join('')}</div>`;
+    V.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { shopTab = b.dataset.st; draw(); });
     V.querySelectorAll('[data-try]').forEach(b => b.onclick = () => play(b.dataset.try));
     V.querySelectorAll('[data-eq]').forEach(b => b.onclick = async () => {
-      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); toast('Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
+      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); toast(b.dataset.eq.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
     });
     V.querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
-      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k);
-      if (!confirm(`Beli efek "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
-      try { st = await api('shop/buy', { item: k }); draw(); toast('Berhasil dibeli: ' + it[1], '🛍️'); play(k); } catch (e) { toast(e.message, '⚠️'); }
+      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k);
+      if (!confirm(`Beli ${k.startsWith('n_') ? 'gaya nama' : 'efek'} "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
+      try { st = await api('shop/buy', { item: k }); draw(); toast('Berhasil dibeli: ' + it[1], '🛍️'); if (!k.startsWith('n_')) play(k); } catch (e) { toast(e.message, '⚠️'); }
     });
   };
   draw();
@@ -937,7 +977,7 @@ const fxGrid = (k, pk) => {
 const STG = [['Tathbiq 1', '#1A7A3C', '📘'], ['Tathbiq 2', '#1573C4', '📗'], ['Tathbiq 3', '#7B2FA0', '📙'], ['Tathbiq 4', '#D9730D', '📕'], ['Tathbiq 5', '#C0392B', '📒'], ['Tathbiq 6', '#B3245B', '📚'], ['Takhossus', '#F2B705', '👑']];
 const stg = n => STG[Math.min(Math.ceil(n / 10), 7) - 1];
 const stgStyle = n => `background:${stg(n)[1]};color:${Math.ceil(n / 10) > 6 ? '#1a1a1a' : '#fff'}`;
-const renderChip = () => { $('#who').innerHTML = av(me.avatar, '', myFx()) + '<span>' + esc(me.username) + '</span>'; };
+const renderChip = () => { $('#who').innerHTML = av(me.avatar, '', myFx()) + '<span>' + nm(me.username, me.fxn) + '</span>'; };
 function toast(msg, ico = '🔔') {
   const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<span>${ico}</span><div>${msg}</div>`;
   $('#toasts').appendChild(t); setTimeout(() => t.remove(), 5200);
@@ -992,7 +1032,7 @@ async function vProfile() {
   try { Object.assign(me, await api('me')); } catch (e) { V.textContent = e.message; return; }
   const xp = Object.values(me.best).reduce((a, b) => a + b, 0), ri = RANKS.reduce((a, r, n) => xp >= r[0] ? n : a, 0);
   let cur = me.avatar || 'a1', pk = me.fxp == null ? null : me.fxp;
-  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg', fxOf(pk))}</div><div><h1>${esc(me.username)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
+  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg', fxOf(pk))}</div><div><h1>${nm(me.username, me.fxn)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
     <p class="muted">${xp} XP · Rekor Tathbiq ${me.best['0:endless'] || 0} XP</p></div></div>
     <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Pilih foto:</p>
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
@@ -1040,7 +1080,7 @@ async function vBoard(j = 0) {
       if (my !== seq) return;
       const box = $('#lbr');
       box.classList.toggle('nofx', !first);
-      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.total > 0 && r.rank <= 3 ? ' top' + r.rank : ''}" data-u="${esc(r.username)}" data-rk="${r.rank}" tabindex="0" role="button" title="Lihat profil" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.avatar, '', r.fx, r.total > 0 && r.rank <= 3 ? r.rank : 0)}<span>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
+      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.total > 0 && r.rank <= 3 ? ' top' + r.rank : ''}${nc(r.nm) ? ' hasnm' : ''}" data-u="${esc(r.username)}" data-rk="${r.rank}" tabindex="0" role="button" title="Lihat profil" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.avatar, '', r.fx, r.total > 0 && r.rank <= 3 ? r.rank : 0)}<span${nc(r.nm) ? ' class="' + nc(r.nm) + '"' : ''}>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
         : `<p class="muted">${bq ? 'Tidak ada murid bernama "' + esc(bq) + '".' : 'Belum ada nilai.'}</p>`;
       box.onclick = e => { const r = e.target.closest('.lrow'); if (r) openPlayer(r.dataset.u, j === 0 ? +r.dataset.rk : 0); };
       box.onkeydown = e => { if (e.key === 'Enter' && e.target.classList.contains('lrow')) e.target.click(); };
@@ -1062,7 +1102,7 @@ async function openPlayer(un, rk) {
   let d; try { d = await api('player?u=' + encodeURIComponent(un)); } catch (e) { toast(e.message, '⚠️'); return; }
   const ri = d.admin ? RANKS.length - 1 : rkOf(d.total), ts = d.tstage, done = d.ach, nj = done.filter(Boolean).length, own = new Set(d.owned);
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="box pbox"><div class="pl"><div>${av(d.avatar, 'lg', d.fx)}</div><div><h2>${esc(d.username)}</h2>
+  m.innerHTML = `<div class="box pbox"><div class="pl"><div>${av(d.avatar, 'lg', d.fx)}</div><div><h2>${nm(d.username, d.nm)}</h2>
       <span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>${d.admin ? ' <span class="tag">🛡️ Admin</span>' : ''}
       <p class="muted" style="margin:6px 0 0">${rk ? 'Peringkat #' + rk + ' · ' : ''}bergabung ${new Date(d.since).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p></div></div>
     <div class="pst"><div><b>${d.total}</b><small>Total XP</small></div><div><b>${nj}/4</b><small>Jilid khatam</small></div><div><b>${d.best['0:endless'] || 0}</b><small>Rekor Tathbiq</small></div></div>
@@ -1071,12 +1111,14 @@ async function openPlayer(un, rk) {
     <h3>Rank liga</h3><div class="ach">${RANKS.map((r, n) => `<div class="ac${n <= ri ? ' on' : ''}" style="--c:${r[3]}"><span>${RI(n, 44)}</span><b>${r[1]}</b><small>${r[0]} XP</small></div>`).join('')}</div>
     <h3>Koleksi item (${SHOP.filter(x => x[0] === 'confetti' || own.has(x[0])).length}/${SHOP.length})</h3><p class="muted" style="margin:0 0 8px;font-size:.85rem">Ketuk item yang dimiliki untuk melihat efeknya.</p>
     <div class="itg">${SHOP.map(([k, nm, ic, tr]) => { const has = k === 'confetti' || own.has(k), eq = (d.equipped || 'confetti') === k; return `<button class="itm${has ? ' own' : ''}${has && eq ? ' eq' : ''}" style="--tc:${TIER[tr]}" data-k="${k}"${has ? '' : ' disabled'}><span>${has ? ic : '🔒'}</span><b>${nm}</b><small>${tr}</small></button>`; }).join('')}</div>
+    <h3>Gaya nama (${NSHOP.filter(x => x[0] !== 'n_none' && own.has(x[0])).length}/${NSHOP.length - 1})</h3>
+    <div class="itg">${NSHOP.filter(x => x[0] !== 'n_none').map(([k, nm_, , tr]) => { const has = own.has(k), eq = d.nm === k; return `<div class="itm${has ? ' own' : ''}${has && eq ? ' eq' : ''}" style="--tc:${TIER[tr]}"><span>${has ? `<b class="${nc(k)}" style="font-size:1.05rem">Aa</b>` : '🔒'}</span><b>${nm_}</b><small>${tr}</small></div>`; }).join('')}</div>
     <div class="row" style="margin-top:16px"><span></span><button class="btn" id="plx">Tutup</button></div></div>`;
   document.body.appendChild(m);
   const close = () => { m.remove(); removeEventListener('keydown', esc2); }, esc2 = e => { if (e.key === 'Escape') close(); };
   addEventListener('keydown', esc2);
   m.querySelector('#plx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
-  m.querySelectorAll('.itm.own').forEach(b => b.onclick = () => { if (!RM) (FX[b.dataset.k] || FX.confetti)(b.getBoundingClientRect(), b); });
+  m.querySelectorAll('.itm.own[data-k]').forEach(b => b.onclick = () => { if (!RM) (FX[b.dataset.k] || FX.confetti)(b.getBoundingClientRect(), b); });
 }
 
 /* ---------- Admin ---------- */
