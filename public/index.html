@@ -391,6 +391,7 @@ async function api(p, b) {
   const d = await r.json().catch(() => ({}));
   if (r.status === 401 && tok && p !== 'login' && p !== 'register') { tok = null; try { localStorage.removeItem('tk'); } catch (e) {} setTimeout(boot, 0); }
   if (!r.ok) throw new Error(d.error || 'Terjadi kesalahan');
+  if (p === 'me' && d.rankGot) setTimeout(() => toast(`Bonus harian rank <b>${RANKS[rkOf(Object.values(d.best || {}).reduce((a, b) => a + b, 0))][1]}</b>: +${d.rankGot} ${GL}`, '🎁'), 900);
   return d;
 }
 const closeMenu = () => $('#app').classList.remove('open');
@@ -797,7 +798,7 @@ async function vShop() {
     sync(); const g = st.gold, nameTab = shopTab === 'nm', list = nameTab ? NSHOP : SHOP;
     V.innerHTML = `<div class="shopbar"><h1>Toko</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
       <div class="tabs"><button data-st="fx" class="${nameTab ? '' : 'on'}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button></div>
-      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold didapat dari tiap level, sama seperti XP: setiap rekor baru menambah XP dan Gold sebanyak yang sama. Belanjakan untuk efek yang muncul saat jawabanmu benar. '}Membeli tidak mengurangi XP atau rankmu.${st.admin ? ' Sebagai admin, semua item terbuka untukmu.' : ''}</p>
+      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold didapat dari tiap level, sama seperti XP: setiap rekor baru menambah XP dan Gold sebanyak yang sama. Belanjakan untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rankmu (${RANKS[rkOf(totalXp())][1]}): +${me.pays[rkOf(totalXp())]} Gold, otomatis tiap hari. ` : ''}Membeli tidak mengurangi XP atau rankmu.${st.admin ? ' Sebagai admin, semua item terbuka untukmu.' : ''}</p>
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
         const free = k === 'confetti' || k === 'n_none', own = free || st.owned.includes(k), pr = st.prices[k] || 0;
         const eq = nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
@@ -923,8 +924,9 @@ const JN = j => Object.keys(LV).filter(k => qd(j, k)).length, JD = j => JN(j) ==
 /* [batas XP, nama, warna teks di atas warna rank, warna rank]. Batas XP harus sama dengan query admin/stats di backend. Ikon: gambar /rank/<nama>.webp (bronze, silver, gold, platinum, diamond, legend). */
 const RANKS = [[0, 'Bronze', '#1a1a1a', '#CD7F32'], [300, 'Silver', '#1a1a1a', '#B8C2CC'], [700, 'Gold', '#1a1a1a', '#F2B705'], [1200, 'Platinum', '#1a1a1a', '#46C2B5'], [1800, 'Diamond', '#1a1a1a', '#3AA9F0'], [3000, 'Legend', '#ffffff', '#B13CFF']];
 const RI = (n, sz = 40) => `<img class="ri" src="/rank/${RANKS[n][1].toLowerCase()}.webp" width="${sz}" height="${sz}" alt="" draggable="false">`;
+const payText = () => { const p = me && me.pays; return p ? RANKS.map((r, i) => r[1] + ' ' + p[i]).join(', ') : ''; };
 const rkOf = t => RANKS.reduce((a, r, n) => t >= r[0] ? n : a, 0), totalXp = () => Object.values(me.best).reduce((a, b) => a + b, 0);
-function noteRank(t0) { const a = rkOf(t0), b = rkOf(totalXp()); if (b > a) setTimeout(() => toast(`Pencapaian baru: <b>${RANKS[b][1]}</b>! Rankmu naik.`, RI(b, 34)), 500); }
+function noteRank(t0) { const a = rkOf(t0), b = rkOf(totalXp()); if (b > a) setTimeout(() => toast(`Pencapaian baru: <b>${RANKS[b][1]}</b>! Rankmu naik.${me.pays ? ' Bonus harian jadi <b>+' + me.pays[b] + '</b> ' + GL + ' mulai besok.' : ''}`, RI(b, 34)), 500); }
 function vHome() {
   const tot = Object.values(me.best).reduce((a, b) => a + b, 0), tat = TAT();
   const ri = RANKS.reduce((a, r, n) => tot >= r[0] ? n : a, 0), nx = RANKS[ri + 1], rk = RANKS[ri];
@@ -1126,7 +1128,7 @@ const GUIDE = {
     <li>Di <b>Profil</b> kamu bisa mengganti username, foto, dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
-    <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya. Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
+    <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
     <li><b>Kuis Harian:</b> 10 soal acak dari semua jilid, sekali sehari dan tidak bisa diulang. Nilai minimal 80 memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
@@ -1135,18 +1137,19 @@ const GUIDE = {
     <li>XP Tathbiq <b>tanpa batas</b>. Rekor terbaikmu masuk ke total XP, dan ada tab khusus Tathbiq di leaderboard.</li>
     <li>Mencapai tahap baru memberi <b>pencapaian</b> yang tampil di profilmu. Skor tersimpan tiap soal, jadi keluar di tengah jalan tetap tercatat.</li></ul>`
 };
+const guideTxt = k => GUIDE[k].replace('@@GOLDINFO@@', me && me.starter ? ` Murid baru mendapat Gold awal ${me.starter}, dan setiap hari kamu mendapat bonus Gold sesuai rank (${payText()}) yang masuk otomatis saat kamu membuka aplikasi. Bonus tidak menumpuk kalau sehari tidak dibuka.` : '');
 function openGuide() {
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="box"><h2>Panduan Al-Miftah</h2><div class="tabs"><button class="on" data-g="app">Sistem aplikasi</button><button data-g="tat">Mode Tathbiq</button></div><div id="gb">${GUIDE.app}</div><div class="row"><span></span><button class="btn" id="gx">Mengerti</button></div></div>`;
+  m.innerHTML = `<div class="box"><h2>Panduan Al-Miftah</h2><div class="tabs"><button class="on" data-g="app">Sistem aplikasi</button><button data-g="tat">Mode Tathbiq</button></div><div id="gb">${guideTxt('app')}</div><div class="row"><span></span><button class="btn" id="gx">Mengerti</button></div></div>`;
   document.body.appendChild(m);
-  m.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { m.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x === b)); m.querySelector('#gb').innerHTML = GUIDE[b.dataset.g]; });
+  m.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { m.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x === b)); m.querySelector('#gb').innerHTML = guideTxt(b.dataset.g); });
   const close = () => m.remove(); m.querySelector('#gx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
 }
 /* Pemberitahuan untuk murid yang baru daftar; setelah ditutup, panduan muncul bila belum pernah dilihat */
 function openWelcome(thenGuide) {
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="box"><h2>Selamat datang, ${esc(me.username)}! 🎉</h2><p class="muted">Akunmu sudah jadi. Ada beberapa hal penting yang perlu kamu ketahui:</p>
-    <ul class="gl"><li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
+    <ul class="gl">${me.starter ? `<li><b>Gold awal ${me.starter} ${GL}!</b> Murid baru mendapat Gold untuk dibelanjakan di menu <b>Toko</b>. Setiap hari kamu juga mendapat Gold bonus sesuai rank (${payText()}), otomatis saat kamu membuka aplikasi.</li>` : ''}<li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
     <li><b>Jaga passwordmu.</b> Jangan beritahukan ke siapa pun, termasuk teman. Admin tidak bisa melihat passwordmu; kalau lupa, admin hanya bisa mengaturnya ulang.</li>
     <li><b>Password bisa diganti</b> kapan saja lewat menu <b>Profil</b>.</li>
     <li><b>Username bisa diubah nanti.</b> Buka menu <b>Profil</b>, lalu ubah username (3–20 karakter: huruf, angka, atau _). Username tampil di leaderboard, jadi pilih nama yang sopan.</li>
