@@ -7,6 +7,12 @@ const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: 
 const bad = (m, s = 400) => J({ error: m }, s);
 // Toko: harga efek jawaban benar (gold). 'confetti' bawaan dan gratis. Gold = XP rekor x GOLD_RATE, dikurangi total belanja.
 const GOLD_RATE = 1;
+// Gold tambahan di luar XP rekor dan hadiah spin. Dicatat di tabel gold_grants (satu baris per pemberian) dan ikut dihitung lewat gold_total_bonus().
+const STARTER_GOLD = 500;                          // Gold awal untuk murid yang baru mendaftar
+const RANK_MIN = [0, 300, 700, 1200, 1800, 3000];  // batas XP tiap rank (harus sama dengan RANKS di index.html dan admin/stats)
+const RANK_PAY = [50, 100, 150, 200, 250, 300];    // Gold harian per rank: Bronze, Silver, Gold, Platinum, Diamond, Legend
+const GRANTED = new Map();                         // uid -> hari (WIB) bonus rank sudah diperiksa; menghemat satu query per /me
+const wibDay = () => new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
 const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600, fire: 900, ice: 1100, lightning: 1500, comet: 2000, galaxy: 2800 };
 // Toko: gaya nama di leaderboard (kunci diawali n_). Disimpan di purchases seperti efek jawaban; yang terpasang ada di users.fxn.
 const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimmer: 600, n_neon: 800, n_blaze: 1100, n_frost: 1300, n_glitch: 2000, n_rainbow: 2500 };
@@ -85,7 +91,9 @@ export async function onRequest({ request, env, params }) {
       if ((await sql`select 1 from users where lower(username) = lower(${un}) limit 1`).length) return bad('Username sudah dipakai', 409);
       const salt = crypto.getRandomValues(new Uint8Array(16));
       try {
-        const [u] = await sql`insert into users (username, pass_hash, salt) values (${un}, ${await hash(pw, salt)}, ${b64(salt)}) returning id`;
+        const [u] = await sql`with u as (insert into users (username, pass_hash, salt) values (${un}, ${await hash(pw, salt)}, ${b64(salt)}) returning id),
+          g as (insert into gold_grants (user_id, kind, day, amount) select id, 'starter', (now() at time zone 'Asia/Jakarta')::date, ${STARTER_GOLD}::int from u)
+        select id from u`;
         return J({ token: await authToken(u.id) });
       } catch (e) {
         if (e.code === '23505') return bad('Username sudah dipakai', 409);
@@ -114,17 +122,37 @@ export async function onRequest({ request, env, params }) {
     const getUser = async () => cachedUser ||= (await sql`select id, username, role, avatar, fx, on_board from users where id = ${uid}`)[0] || null;
 
     if (route === 'GET me') {
+      // Bonus Gold harian sesuai rank: sekali sehari (WIB), otomatis saat murid membuka aplikasi. Gagal di sini tidak boleh menggagalkan /me.
+      let got = 0;
+      try {
+        if (GRANTED.get(uid) !== wibDay()) {
+          const gr = await sql`with best as (
+              select max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp
+              from attempts where user_id = ${uid}::int group by jilid, level),
+            tot as (select coalesce(sum(xp), 0) t from best),
+            rk as (select greatest((select count(*) from unnest(${RANK_MIN}::int[]) as m(v) where m.v <= tot.t), 1)::int i from tot)
+            insert into gold_grants (user_id, kind, day, amount)
+            select ${uid}::int, 'rank', (now() at time zone 'Asia/Jakarta')::date, (${RANK_PAY}::int[])[rk.i] from rk
+            where not exists (select 1 from gold_grants where user_id = ${uid}::int and kind = 'rank' and day = (now() at time zone 'Asia/Jakarta')::date)
+              and exists (select 1 from users where id = ${uid}::int and role <> 'admin')
+            on conflict do nothing returning amount`;
+          got = gr.length ? gr[0].amount : 0;
+          if (GRANTED.size > 5000) GRANTED.clear();
+          GRANTED.set(uid, wibDay());
+        }
+      } catch (e) { got = 0; }
       // satu round trip untuk tiga query
       const [[usr], best, [t], [sp], [bn], [rq]] = await sql.transaction([
         sql`select username, role, avatar, fx, fxa, fxn, on_board from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
         sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
-        sql`select gold_bonus(${uid}::int) s`,
+        sql`select gold_total_bonus(${uid}::int) s`,
         sql`select case when (select role from users where id = ${uid}) = 'admin' then (select count(distinct question_id) from question_reports where status = 'open') else 0 end::int n`]);
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
-      return J({ reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      const xpTot = best.reduce((a, r) => a + r.xp, 0), ri = Math.max(0, RANK_MIN.filter(m => m <= xpTot).length - 1);
+      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -283,7 +311,7 @@ export async function onRequest({ request, env, params }) {
 
     // ---------- Toko ----------
     const shopState = async () => {
-      const [best, own, [u], [bn]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_bonus(${uid}::int) s`]);
+      const [best, own, [u], [bn]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_total_bonus(${uid}::int) s`]);
       const earned = best.reduce((a, r) => a + r.xp, 0) * GOLD_RATE, spent = own.reduce((a, r) => a + r.price, 0), admin = !!u && u.role === 'admin';
       return { gold: earned + bn.s - spent, earned, bonus: bn.s, spent, admin, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: u ? u.fxa : null, equippedName: u ? u.fxn : null, prices: PRICES };
     };
@@ -296,7 +324,7 @@ export async function onRequest({ request, env, params }) {
       const [, ins] = await sql.transaction([
         sql`select pg_advisory_xact_lock(${uid}::int)`,
         sql`with best as (select max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts where user_id = ${uid} group by jilid, level),
-            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce(gold_bonus(${uid}::int), 0) - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
+            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce(gold_total_bonus(${uid}::int), 0) - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
           insert into purchases (user_id, item, price) select ${uid}::int, ${item}::text, ${price}::int from bal where g >= ${price}::int on conflict do nothing returning item`]);
       if (!ins.length) {
         const [own] = await sql`select 1 from purchases where user_id = ${uid} and item = ${item}`;
