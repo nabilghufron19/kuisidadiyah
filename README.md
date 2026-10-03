@@ -1,230 +1,251 @@
 # Al-Miftah Kuis Nahwu
 
-Aplikasi web kuis nahwu untuk murid Madrasah Idadiyah, dengan sistem XP, rank, kuis harian berhadiah, toko efek, dan leaderboard. Dibuat tanpa framework: satu file HTML (vanilla JS) di sisi klien, satu Cloudflare Pages Function di sisi server, dan database Neon (PostgreSQL).
+Aplikasi kuis nahwu untuk murid Madrasah Idadiyah Al-Miftah: 4 jilid, 3 tingkat kesulitan, Kuis Harian + spin hadiah, mode Tathbiq, Toko efek, leaderboard, laporan soal salah, dan Panel Admin (unggah soal dari Excel).
 
-## Fitur
-
-### Untuk murid
-- **Quest Jilid 1–4**: tiap jilid punya 3 level.
-
-  | Level  | Jumlah soal | XP maksimal |
-  |--------|------------:|------------:|
-  | Mudah  | 10          | 100         |
-  | Sedang | 20          | 200         |
-  | Sulit  | 30          | 300         |
-
-  Sebuah level dianggap **selesai** bila benar ≥ 60%. Sebuah jilid **khatam** bila ketiga levelnya selesai.
-- **Mode Tathbiq** (tanpa batas): soal acak dari semua jilid, 3 nyawa, naik tahap tiap 10 soal (Tathbiq 1–6, lalu Takhossus). Terbuka setelah keempat jilid khatam.
-- **Kuis Harian**: 10 soal acak dari semua jilid, satu kesempatan per hari (mengikuti WIB). Nilai ≥ 80 memberi 1 spin hadiah gold (100–1000). Spin ke-10 sejak hadiah langka terakhir dijamin langka (≥ 300 gold).
-- **Toko**: 10 efek jawaban benar (100–2800 gold) yang bisa dibeli dan dipasang.
-- **Rank**: Bronze (0 XP), Silver (300), Gold (700), Platinum (1200), Diamond (1800).
-- **Profil**: ganti username, avatar, efek bingkai profil, dan password. Efek bingkai terbuka bertahap seiring jilid yang khatam dan tahap Tathbiq.
-- **Leaderboard**: per jilid, khusus Tathbiq, atau keseluruhan, lengkap dengan pencarian nama.
-
-### Untuk admin
-- Statistik: jumlah murid, murid aktif 7 hari, percobaan per jilid, sebaran rank.
-- Kelola soal: cari, tambah, ubah, hapus, dan unggah massal dari Excel/CSV.
-- Kelola murid: lihat detail dan riwayat, reset password, hapus akun.
-- Semua fitur murid terbuka untuk admin (Tathbiq, semua efek, semua pencapaian).
-
-## Cara gold dihitung
-
-Gold **tidak disimpan** di database, selalu dihitung ulang:
+Tiga bagian, semuanya bisa memakai paket gratis untuk mulai:
 
 ```
-gold = total XP rekor  +  total hadiah spin  −  total belanja di Toko
+Peramban murid ──►  Cloudflare Pages          ──►  Neon PostgreSQL
+                    • index.html (halaman)         • semua data murid, soal, XP
+                    • functions/api/[[path]].js    • dibuat dari schema.sql
+                      (API, jalan di Cloudflare)
+                          ▲
+                       GitHub (setiap push = deploy otomatis)
 ```
 
-XP rekor adalah nilai terbaik per kombinasi (jilid, level), dijumlahkan. Untuk Tathbiq, XP adalah skor terbaik sesi tersebut.
+Hanya ada **dua variabel lingkungan** yang wajib diisi di Cloudflare: `DATABASE_URL` dan `JWT_SECRET` (lihat bagian 5.3).
 
-## Teknologi
+---
 
-| Lapisan   | Teknologi |
-|-----------|-----------|
-| Frontend  | HTML, CSS, dan JavaScript murni (satu file `index.html`) |
-| Backend   | Cloudflare Pages Functions (`/api/*`) |
-| Database  | Neon (PostgreSQL) lewat `@neondatabase/serverless` |
-| Hosting   | Cloudflare Pages, deploy otomatis dari GitHub |
-| Font      | Amiri dan Plus Jakarta Sans (Google Fonts) |
-| Excel     | Pustaka SheetJS, dimuat saat admin membuka menu unggah soal |
+## 1. Isi repositori
 
-## Struktur project
+Susunan yang disarankan:
 
 ```
-.
-├── index.html                 # seluruh antarmuka (SPA)
-├── logo.png                   # logo yang tampil di halaman masuk dan header
-├── favicon.png
-├── functions/
-│   └── api/
-│       └── [[path]].js        # seluruh endpoint API
-├── schema.sql                 # skema database lengkap (idempotent)
-└── package.json               # dependensi: @neondatabase/serverless
+repo/
+├─ public/                      ← folder yang disajikan ke publik (Build output directory)
+│  ├─ index.html
+│  ├─ logo.png
+│  ├─ favicon.png
+│  └─ rank/
+│     ├─ bronze.webp
+│     ├─ silver.webp
+│     ├─ gold.webp
+│     ├─ platinum.webp
+│     ├─ diamond.webp
+│     └─ legend.webp
+├─ functions/
+│  └─ api/
+│     └─ [[path]].js            ← berkas API (dua kurung siku persis seperti itu)
+├─ package.json
+├─ schema.sql
+└─ README.md
 ```
 
-`[[path]].js` adalah rute catch-all Cloudflare Pages: semua permintaan ke `/api/...` ditangani file ini, dan rute dibedakan lewat `METHOD + path` (misalnya `POST submit`).
+Catatan penting:
 
-## Instalasi
+* Di unduhan, berkas API bernama `__path__.js` karena kurung siku tidak bisa diunggah. **Ganti namanya menjadi `[[path]].js`** dan taruh di `functions/api/`. Dengan nama itu, semua alamat `/api/...` otomatis ditangani berkas tersebut.
+* `schema.sql`, `package.json`, dan `README.md` sengaja berada **di luar** `public/`, supaya tidak bisa diunduh orang lewat alamat situs.
+* Tata letak lain juga boleh (misalnya `index.html` langsung di akar repo). Syaratnya hanya: folder `functions/` ada di akar repo, dan "Build output directory" di Cloudflare diarahkan ke folder tempat `index.html` berada. Kalau `index.html` di akar, berkas seperti `schema.sql` ikut bisa diunduh publik, jadi pindahkan ke `public/` bila bisa.
 
-### 1. Siapkan database Neon
-1. Buat project di [Neon](https://neon.tech).
-2. Buka SQL Editor dan jalankan seluruh isi `schema.sql`.
-   - Skema ini aman dijalankan di database kosong maupun yang sudah berjalan, dan semuanya dalam satu transaksi.
-   - Disarankan menguji dulu di Neon Branch sebelum menjalankannya di branch utama.
-3. Salin connection string database.
+---
 
-### 2. Deploy ke Cloudflare Pages
-1. Pastikan `package.json` ada di root repositori (lihat contoh di bawah) dan folder `functions/api/` berisi `[[path]].js`. Lalu push ke GitHub.
-2. Di dashboard Cloudflare: **Workers & Pages → Create → Pages → Connect to Git**, pilih repositori.
-3. Isi **Build settings** seperti ini:
+## 2. Yang perlu disiapkan
 
-   | Pengaturan               | Isi |
-   |--------------------------|-----|
-   | Production branch        | `main` (atau branch yang Anda pakai) |
-   | Framework preset         | `None` |
-   | Build command            | `npm install` |
-   | Build output directory   | `/` |
-   | Root directory (advanced)| kosongkan (default) |
+Tiga akun (semuanya punya paket gratis; cek batas pemakaian masing-masing di dashboard):
 
-   Catatan:
-   - Project ini tidak punya langkah build karena `index.html` sudah siap pakai. Perintah `npm install` ada agar dependensi backend (`@neondatabase/serverless`) terpasang. Cloudflare juga memasang dependensi dari `package.json` saat build, jadi `npm install` di sini sekadar jaga-jaga.
-   - Kalau Cloudflare menolak kolom Build command kosong, `exit 0` juga bisa dipakai.
-   - Build output directory `/` berarti file statis diambil dari root repositori. Karena itu `index.html`, `logo.png`, dan `favicon.png` harus ada di root, bukan di subfolder.
-   - Folder `functions/` di root otomatis dikenali Cloudflare sebagai Pages Functions. Tidak perlu pengaturan tambahan.
-4. Buka **Environment variables** (saat setup awal, atau nanti di *Settings → Variables and Secrets*) dan tambahkan:
+1. **GitHub**: https://github.com
+2. **Neon**: https://neon.com (database PostgreSQL)
+3. **Cloudflare**: https://dash.cloudflare.com (Pages)
 
-   | Nama           | Isi |
-   |----------------|-----|
-   | `DATABASE_URL` | Connection string Neon, contoh `postgresql://user:password@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require` |
-   | `JWT_SECRET`   | String acak panjang (minimal 32 karakter) untuk menandatangani token. Jaga kerahasiaannya |
+---
 
-   Isi untuk **Production**, dan juga **Preview** bila Anda memakai preview deployment (sebaiknya `DATABASE_URL` Preview mengarah ke Neon Branch terpisah). Menghasilkan `JWT_SECRET` bisa dengan `openssl rand -base64 48`.
-5. Klik **Save and Deploy**. Setelah selesai, aplikasi tersedia di `https://<nama-project>.pages.dev`.
-6. Setiap kali Anda mengubah environment variable, lakukan **deploy ulang** (Deployments → Retry deployment, atau push commit baru) agar nilainya terbaca.
+## 3. Neon (database)
 
-Contoh `package.json` minimal:
+### 3.1 Buat proyek
+1. Masuk ke Neon Console, klik **Create project**.
+2. Beri nama (mis. `al-miftah`). Pilih region yang paling dekat dengan pengguna; untuk Indonesia, pilih **Asia Pacific (Singapore)**.
+3. Klik **Create**.
 
-```json
-{
-  "name": "almiftah-kuis",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@neondatabase/serverless": "^0.10.0"
-  }
-}
+### 3.2 Buat tabel
+1. Di proyek tadi buka **SQL Editor**.
+2. Buka `schema.sql`, salin **seluruh isinya**, tempel ke editor, lalu klik **Run**.
+3. Pesan sukses berarti semua tabel, indeks, dan fungsi `gold_bonus` sudah dibuat.
+
+`schema.sql` aman dijalankan berulang kali, dan aman di database yang sudah berisi data (tidak menghapus atau mengubah apa pun yang sudah ada). Kalau database Anda sudah berisi data murid, uji dulu di **Branches → Create branch**, baru jalankan di branch utama.
+
+### 3.3 Salin connection string
+1. Di **Dashboard** proyek, klik **Connect**.
+2. Pilih branch `main`, database `neondb`, dan role bawaan.
+3. Nyalakan **Connection pooling** (alamatnya mengandung `-pooler`) dan salin **connection string** yang tampil. Bentuknya:
+
+```
+postgresql://NAMA_ROLE:PASSWORD@ep-xxxx-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 ```
 
-### Uji di komputer sendiri (opsional)
+Simpan di tempat aman. Ini nilai untuk `DATABASE_URL` di Cloudflare. **Jangan** menaruhnya di GitHub atau kode.
 
-Pakai Wrangler untuk menjalankan frontend dan API sekaligus secara lokal:
+---
+
+## 4. GitHub
+
+1. Klik **New repository**, beri nama (mis. `kuisidadiyah`), pilih **Private**, lalu **Create repository**.
+2. Unggah berkas sesuai susunan di bagian 1:
+   * Lewat web: **Add file → Upload files** untuk `public/`, `package.json`, `schema.sql`, `README.md`.
+   * Untuk API: **Add file → Create new file**, ketik namanya `functions/api/[[path]].js` (garis miring otomatis membuat folder), lalu tempel isi `__path__.js`.
+3. Atau lewat terminal:
 
 ```bash
-npm install
+git init
+git add .
+git commit -m "Instalasi awal"
+git branch -M main
+git remote add origin https://github.com/USERNAME/NAMA_REPO.git
+git push -u origin main
 ```
 
-Buat file `.dev.vars` di root project (jangan di-commit, masukkan ke `.gitignore`):
+Tambahkan juga berkas `.gitignore` berisi:
 
 ```
-DATABASE_URL=postgresql://...
-JWT_SECRET=isi-acak-untuk-development
+node_modules/
+.dev.vars
+.env
+.wrangler/
 ```
 
-Lalu jalankan:
+---
 
-```bash
-npx wrangler pages dev .
-```
+## 5. Cloudflare Pages
 
-Aplikasi akan terbuka di `http://localhost:8788`. Gunakan Neon Branch terpisah untuk `DATABASE_URL` lokal agar data produksi aman.
+### 5.1 Hubungkan repositori
+1. Di Cloudflare Dashboard buka **Workers & Pages → Create application → Pages → Connect to Git**. (Nama menu bisa sedikit berbeda antar versi dashboard.)
+2. Izinkan Cloudflare membaca GitHub Anda, lalu pilih repositori tadi dan klik **Begin setup**.
 
-### 3. Buat akun admin
-1. Daftar lewat aplikasi (akun baru otomatis berperan `student`).
-2. Jadikan admin lewat SQL Editor Neon:
+### 5.2 Pengaturan build
 
+| Kolom | Isi |
+|---|---|
+| Project name | bebas (menjadi alamat `nama.pages.dev`) |
+| Production branch | `main` |
+| Framework preset | **None** |
+| Build command | *(kosongkan)* |
+| Build output directory | **`public`** (atau folder tempat `index.html` berada) |
+| Root directory | *(kosongkan)* |
+
+Tidak ada langkah build: halaman disajikan apa adanya, dan Cloudflare memasang dependensi dari `package.json` untuk berkas API.
+
+### 5.3 Variabel lingkungan (yang harus diisi)
+
+Isi di bagian **Environment variables** pada layar setup, atau nanti di **Settings → Variables and Secrets** proyek. Pilih tipe **Secret** (Encrypt) untuk keduanya.
+
+| Nama | Wajib | Isi | Keterangan |
+|---|---|---|---|
+| `DATABASE_URL` | Ya | connection string Neon dari 3.3 | Tanpa ini semua API gagal. |
+| `JWT_SECRET` | Ya | teks acak panjang, minimal 32 karakter | Kunci penanda tangan token login (masa berlaku 7 hari). Buat dengan `openssl rand -base64 48`, atau ketik acak 40+ karakter. |
+| `NODE_VERSION` | Tidak | `22` | Hanya bila build gagal karena versi Node terlalu lama. |
+
+Catatan:
+* Hanya dua variabel itu yang dibaca kode (`env.DATABASE_URL` dan `env.JWT_SECRET`). Tidak ada variabel lain.
+* Kalau `JWT_SECRET` kosong, login dan daftar akan gagal dengan error server.
+* **Mengganti `JWT_SECRET` mengeluarkan semua murid dari akun mereka** (token lama tidak berlaku). Mereka tinggal masuk lagi; data tidak hilang.
+* Cloudflare punya dua lingkungan, **Production** dan **Preview** (untuk branch/PR). Kalau memakai Preview, isi variabelnya di sana juga. Sebaiknya Preview memakai database Neon branch terpisah.
+* Perubahan variabel baru berlaku pada **deploy berikutnya**. Setelah mengubahnya, jalankan ulang deploy (Deployments → deploy terakhir → Retry deployment) atau push satu commit.
+
+### 5.4 Deploy
+Klik **Save and Deploy**. Setelah selesai, situs aktif di `https://NAMA_PROYEK.pages.dev`. Setiap `git push` ke `main` otomatis men-deploy ulang.
+
+### 5.5 Domain sendiri (opsional)
+Proyek Pages → **Custom domains → Set up a custom domain**, lalu ikuti petunjuknya.
+
+---
+
+## 6. Setelah deploy: langkah pertama
+
+1. Buka situs, klik daftar. Username 3–20 karakter (huruf, angka, garis bawah), password minimal 6 karakter.
+2. Jadikan akun itu admin lewat Neon SQL Editor:
    ```sql
    update users set role = 'admin' where lower(username) = lower('NAMA_ADMIN');
    ```
+   Muat ulang situs; menu **Panel Admin** akan muncul.
+3. Buka **Panel Admin → Kelola soal**, unduh template Excel, isi, lalu unggah (format di bagian 7).
+4. Coba satu kuis dari akun murid biasa untuk memastikan soal muncul, dan coba tombol 🚩 Lapor, lalu cek tab **Laporan** di akun admin.
 
-### 4. Isi bank soal
-Masuk sebagai admin, buka menu Admin → Soal, lalu unggah file Excel/CSV dengan kolom:
+---
 
-| jilid | pertanyaan | A | B | C | D | jawaban |
-|-------|------------|---|---|---|---|---------|
-| 1     | Contoh pertanyaan? | Opsi 1 | Opsi 2 | Opsi 3 | Opsi 4 | A |
+## 7. Format Excel bank soal
 
-- `jilid` berisi 1–4 dan `jawaban` berisi huruf A–D. Semua kolom wajib diisi.
-- Maksimal 2000 baris per unggahan.
-- Centang "Ganti soal lama pada jilid yang ada di file" bila ingin menimpa soal lama.
-- Template bisa diunduh langsung dari halaman tersebut.
-- Kuis harian butuh minimal 10 soal di bank soal.
+Kolom (baris pertama adalah judul; nama kolom tidak peka huruf besar/kecil):
 
-## Skema database
+| jilid | bab | pertanyaan | A | B | C | D | jawaban |
+|---|---|---|---|---|---|---|---|
+| 1 | Bab 1 | Contoh pertanyaan? | Opsi 1 | Opsi 2 | Opsi 3 | Opsi 4 | A |
 
-| Tabel             | Fungsi |
-|-------------------|--------|
-| `users`           | Akun, peran (`student`/`admin`), avatar, efek bingkai, efek jawaban terpasang |
-| `questions`       | Bank soal (jilid 1–4, empat opsi, kunci jawaban) |
-| `attempts`        | Percobaan kuis dan Tathbiq. Dasar perhitungan XP, rank, dan gold. **Jangan dihapus** |
-| `endless_runs`    | Sesi Tathbiq (nyawa, skor, urutan soal). Tahap tertinggi dihitung dari sini |
-| `purchases`       | Efek Toko yang sudah dibeli, dengan harga saat pembelian |
-| `daily`           | Kuis harian per murid per hari, plus hasil spin hadiah |
-| `login_attempts`  | Pembatas percobaan login |
+* `jilid` wajib 1–4; `jawaban` wajib huruf A–D; semua kolom lain kecuali `bab` wajib terisi.
+* `bab` **boleh kosong atau kolomnya dihapus**. Soal tanpa bab tetap dipakai sebagai cadangan acak. Soal ber-bab diprioritaskan, diambil bergiliran per bab supaya semua bab tercakup.
+* Maksimal 2000 baris per unggahan. Satu baris salah menggagalkan seluruh unggahan (pesan menyebut nomor barisnya).
+* Centang **Ganti soal lama pada jilid yang ada di file** bila ingin menimpa; kalau tidak, soal ditambahkan ke yang sudah ada (mengunggah file yang sama dua kali membuat soal ganda).
+* Sebelum menimpa, klik **Unduh semua soal** sebagai cadangan.
 
-## Daftar endpoint API
+---
 
-Semua di bawah `/api/`. Selain `login` dan `register`, semua membutuhkan header `Authorization: Bearer <token>`.
+## 8. Memperbarui aplikasi
 
-| Metode & rute | Fungsi |
-|---------------|--------|
-| `POST register`, `POST login` | Daftar dan masuk, mengembalikan token |
-| `GET me` | Profil, XP rekor, pencapaian, status Tathbiq |
-| `GET quiz?jilid=&level=` | Mulai kuis jilid |
-| `POST submit` | Kirim jawaban kuis, nilai dihitung ulang di server |
-| `POST endless/start`, `endless/more`, `endless/sync`, `endless/stop` | Siklus mode Tathbiq |
-| `GET daily`, `POST daily/start`, `daily/submit`, `daily/spin` | Kuis harian dan spin hadiah |
-| `GET shop`, `POST shop/buy`, `shop/equip` | Toko |
-| `POST profile`, `POST password` | Ubah profil dan password |
-| `GET leaderboard?jilid=&q=` | Papan peringkat (cache 10 detik per isolate) |
-| `GET admin/stats`, `admin/users`, `admin/user`, `admin/questions` | Data admin |
-| `POST admin/questions`, `admin/question-save`, `admin/question-delete`, `admin/reset-password`, `admin/delete-user` | Aksi admin |
+* Ubah berkas di GitHub (atau `git push`), Cloudflare men-deploy otomatis dalam beberapa menit.
+* Kalau pembaruan menambah kolom atau tabel, jalankan `schema.sql` terbaru di Neon **sebelum** meng-deploy kode barunya. Aman untuk kode lama karena hanya menambah.
+* Kualitas efek Toko: di Profil ada pilihan Otomatis / Tinggi / Sedang / Rendah. Untuk mengukur kelancaran, buka situs dengan `/?fps` di ujung alamat.
 
-## Keamanan dan anti-curang
+Pengaturan yang bisa diubah di kode `functions/api/[[path]].js` (bukan di variabel lingkungan):
 
-- Password di-hash dengan PBKDF2 (SHA-256, 100.000 iterasi) dan salt acak. Panjang password dibatasi 6–128 karakter.
-- Token berupa HMAC-SHA256 yang ditandatangani dengan `JWT_SECRET`, berlaku 7 hari.
-- Login dibatasi 8 kali gagal per username dalam 15 menit. Waktu respons dibuat sama walau username tidak ada.
-- Skor selalu **dihitung ulang di server** terhadap kunci jawaban di database.
-- Setiap kuis punya `nonce` unik sehingga tidak bisa dikirim dua kali.
-- Pengiriman yang lebih cepat dari 1 detik per soal ditolak.
-- Pembelian di Toko memakai advisory lock agar dua permintaan bersamaan tidak bisa melewati saldo.
-- Kuis harian dibuat saat dimulai, sehingga tidak bisa diulang dengan menutup halaman.
+| Konstanta | Nilai sekarang | Arti |
+|---|---|---|
+| `GOLD_RATE` | 1 | Gold per XP rekor |
+| `PASS_PCT` | 60 | Persen benar agar sebuah quest dianggap selesai |
+| `DAILY_N` / `DAILY_PASS` | 10 / 80 | Jumlah soal Kuis Harian / nilai minimal untuk dapat spin |
+| `RARE` / `PITY` | 300 / 10 | Batas hadiah langka / spin ke-10 dijamin langka |
+| `LOGIN_MAX` / `LOGIN_MIN` | 8 / 15 | Maksimal gagal login per username / dalam berapa menit |
+| `REPORT_DAY` | 30 | Maksimal laporan soal per murid per hari |
+| `SHOP`, `NSHOP` | harga 100–2800 | Harga efek jawaban dan gaya nama |
 
-**Catatan:** kunci jawaban ikut dikirim ke browser saat kuis dimulai (agar jawaban bisa dicek tanpa request per soal). Nilai tetap dihitung ulang di server, tetapi murid yang membuka DevTools bisa melihat jawaban yang benar.
+---
 
-## Perawatan
+## 9. Pemecahan masalah
 
-Perintah SQL berikut tersedia di bagian bawah `schema.sql`:
+| Gejala | Penyebab umum | Solusi |
+|---|---|---|
+| Halaman tampil, tapi daftar/masuk gagal atau error server | `DATABASE_URL` atau `JWT_SECRET` belum diisi / salah | Periksa 5.3, lalu deploy ulang. Lihat log di proyek Pages (tab Functions → Real-time logs; nama menu bisa berbeda). |
+| `/api/...` menghasilkan 404 | Berkas API salah nama atau salah folder | Harus `functions/api/[[path]].js`, di akar repo. |
+| Error `function gold_bonus does not exist` atau `column "fxn"/"on_board"/"bab" does not exist` | `schema.sql` belum dijalankan | Jalankan `schema.sql` di Neon SQL Editor. |
+| Logo atau gambar rank tidak muncul | `logo.png`, `favicon.png`, `rank/*.webp` tidak ada di folder output | Pastikan berkas ada di `public/` dan Build output directory = `public`. |
+| Variabel sudah diubah tapi tidak berpengaruh | Belum deploy ulang | Retry deployment atau push commit. |
+| Semua murid tiba-tiba keluar akun | `JWT_SECRET` diganti | Normal; murid masuk lagi. |
+| Build gagal di langkah install | Versi Node atau lockfile | Tambahkan variabel `NODE_VERSION` = `22`; bila perlu jalankan `npm install` sekali di komputer ber-Node.js lalu commit `package-lock.json`. |
+| "Terlalu banyak percobaan gagal" saat login | 8 kali salah dalam 15 menit | Tunggu 15 menit, atau hapus catatannya: `delete from login_attempts where key = 'u:namauser';` (huruf kecil semua). |
+| Permintaan pertama setelah lama sepi terasa lambat | Database Neon tidur saat tidak dipakai | Normal pada paket gratis; berikutnya cepat kembali. |
+| Efek jawaban patah-patah di HP | Perangkat lemah | Profil → Kualitas efek jawaban → pilih Rendah (Otomatis biasanya menurunkannya sendiri). |
 
-- Cek gold seorang murid (harus sama dengan angka di Beranda/Toko).
-- Mengulang kuis harian untuk keperluan tes, tanpa menghilangkan hadiah spin.
-- Membersihkan catatan `login_attempts` yang sudah lewat masa kunci.
-- Menghapus tabel lama `quiz_answers` bila masih ada.
+---
 
-## Mengubah aturan permainan
+## 10. Keamanan dan cadangan
 
-Konstanta ada di bagian atas `functions/api/[[path]].js`:
+* Jangan pernah menaruh `DATABASE_URL` atau `JWT_SECRET` di GitHub, kode, atau tangkapan layar. Kalau terlanjur bocor: di Neon ganti password role (Roles → Reset password) lalu perbarui `DATABASE_URL`; ganti juga `JWT_SECRET`.
+* Password murid disimpan sebagai hash PBKDF2 (100.000 iterasi) dengan salt; admin tidak bisa melihat password, hanya mereset.
+* Cadangan soal: **Panel Admin → Unduh semua soal** (Excel).
+* Cadangan database: gunakan fitur Neon (Branches dan riwayat pemulihan; cek lama penyimpanannya di paket Anda), atau ekspor tabel penting dari SQL Editor secara berkala.
 
-| Konstanta | Fungsi |
-|-----------|--------|
-| `SHOP` | Daftar dan harga efek di Toko |
-| `PRIZES`, `RARE`, `PITY` | Hadiah spin, batas hadiah langka, dan jumlah spin sampai hadiah langka dijamin |
-| `DAILY_N`, `DAILY_PASS` | Jumlah soal dan nilai lulus kuis harian |
-| `PASS_PCT` | Persentase benar agar sebuah quest dianggap selesai |
-| `LOGIN_MAX`, `LOGIN_MIN` | Batas dan masa kunci percobaan login |
+---
 
-Batas rank (300/700/1200/1800) didefinisikan di dua tempat dan **harus sama**: `RANKS` di `index.html` dan query `admin/stats` di backend.
+## Lampiran: tabel database
 
-## Lisensi
+| Tabel | Isi |
+|---|---|
+| `users` | akun murid dan admin; foto, efek profil, efek jawaban (`fxa`), gaya nama (`fxn`), `on_board` untuk admin |
+| `questions` | bank soal per jilid, kolom `bab` opsional |
+| `attempts` | hasil kuis dan Tathbiq; dasar perhitungan XP, rank, gold |
+| `endless_runs` | sesi Mode Tathbiq (nyawa, skor, urutan soal) |
+| `purchases` | efek dan gaya nama yang dibeli beserta harganya |
+| `daily` | Kuis Harian per murid per hari (WIB) dan hasil spin hadiah |
+| `login_attempts` | pembatas percobaan login |
+| `question_reports` | laporan soal salah dari murid beserta statusnya |
+| fungsi `gold_bonus(user)` | total hadiah spin harian seorang murid |
 
-Syain Adzim (nabil ghufron) 1447 1448
+Gold tidak disimpan: `gold = XP rekor + gold_bonus − total belanja`.
