@@ -128,7 +128,7 @@ node_modules/
 | Project name | bebas (menjadi alamat `nama.pages.dev`) |
 | Production branch | `main` |
 | Framework preset | **None** |
-| Build command | *(kosongkan)* |
+| Build command | *npm install* |
 | Build output directory | **`public`** (atau folder tempat `index.html` berada) |
 | Root directory | *(kosongkan)* |
 
