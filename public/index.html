@@ -321,7 +321,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .rpt:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
 .rpt:disabled{opacity:.6;cursor:default}
 .rkinds label{display:flex;gap:10px;align-items:center;margin:6px 0;cursor:pointer}.rkinds input{width:auto;margin:0}
-.bablist{margin:6px 0 0;font-size:.8rem}
+.bablist{margin:6px 0 0;font-size:.8rem}.bablist summary{cursor:pointer;font-weight:600;color:var(--accent);list-style:none}.bablist summary::-webkit-details-marker{display:none}.babchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.babchips span{background:var(--soft);border-radius:999px;padding:1px 10px;font-size:.76rem}.babchips b{opacity:.75;margin-left:2px}
 </style>
 </head>
 <body>
@@ -429,7 +429,7 @@ function vAuth() {
 /* ---------- Efek ---------- */
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* Perangkat lawas: pulsa cahaya (box-shadow beranimasi) dimatikan, cincin berputar tetap jalan */
-if ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4 && /Android|Mobi/i.test(navigator.userAgent))) document.documentElement.classList.add('lite');
+/* Kualitas efek (Tinggi/Sedang/Rendah) diatur oleh FXQ di bagian Efek 3D; kelas 'lite' dinyalakan saat kualitas Rendah. */
 const pick = a => a[Math.floor(Math.random() * a.length)];
 let tt;
 function typeIt(el, text) {
@@ -447,6 +447,7 @@ function count(el, to, ms = 900) {
 }
 function burst(x, y, n = 14) {
   if (RM) return;
+  n = Math.max(6, Math.round(n * Q().ns));
   const cs = ['#2EAD5C', '#F5A623', '#EF5B5B', '#4C9AFF', '#F5C518'];
   for (let i = 0; i < n; i++) {
     const p = document.createElement('i'), a = Math.random() * 6.28, d = 60 + Math.random() * 130;
@@ -458,8 +459,39 @@ function burst(x, y, n = 14) {
 
 /* ---------- Toko: efek jawaban benar (3D) ---------- */
 const GL = '🪙', R = (a, b) => a + Math.random() * (b - a);
-const LITE = () => document.documentElement.classList.contains('lite');
-const N = n => Math.max(4, Math.round(n * (LITE() ? .5 : 1)));
+/* Kualitas efek. dpr = resolusi kanvas, ns = pengali jumlah partikel, cap = jari-jari cahaya maksimal (px), glow = bayangan tombol [blur, sebar],
+   shake/flash = pengali guncangan & kilat layar (0 = mati), cull = buang sisi belakang kristal. */
+const QT = {
+  high: { dpr: 2, ns: 1, cap: 1e9, glow: [70, 26], shake: 1, flash: 1, cull: 0 },
+  mid: { dpr: 1.25, ns: .7, cap: 120, glow: [40, 14], shake: .6, flash: .6, cull: 1 },
+  low: { dpr: 1, ns: .4, cap: 70, glow: null, shake: 0, flash: 0, cull: 1 },
+};
+const QN = { high: 'Tinggi', mid: 'Sedang', low: 'Rendah' };
+const qGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const qSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const FXQ = (() => { // mode: auto | high | mid | low. Otomatis: awal dari jenis perangkat, lalu turun sendiri bila efek terukur patah-patah.
+  const mob = /Android|Mobi|iPhone|iPad/i.test(navigator.userAgent);
+  const weak = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4 && mob);
+  let mode = qGet('fxq'), auto = qGet('fxqa');
+  if (!QT[mode]) mode = 'auto';
+  if (!QT[auto]) auto = weak ? 'low' : mob ? 'mid' : 'high';
+  const lvl = () => (mode === 'auto' ? auto : mode), apply = () => document.documentElement.classList.toggle('lite', lvl() === 'low');
+  apply();
+  return {
+    get mode() { return mode; }, get level() { return lvl(); },
+    set(m) { mode = QT[m] ? m : 'auto'; qSet('fxq', mode); apply(); E3.refit(); },
+    down() { if (mode !== 'auto' || auto === 'low') return false; auto = auto === 'high' ? 'mid' : 'low'; qSet('fxqa', auto); apply(); E3.refit(); return true; },
+  };
+})();
+const Q = () => QT[FXQ.level], LITE = () => FXQ.level === 'low';
+const N = n => Math.max(4, Math.round(n * Q().ns));
+/* Alat ukur: buka situs dengan ?fps di alamatnya untuk melihat kelancaran tiap efek di pojok kiri bawah. */
+const FXDBG = /[?&]fps\b/.test(location.search);
+const dbg = (mean, p75, worst, peak, shed, down) => {
+  let d = document.getElementById('fxdbg');
+  if (!d) { d = document.createElement('div'); d.id = 'fxdbg'; d.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:200;max-width:92vw;font:11px/1.35 monospace;background:rgba(0,0,0,.78);color:#9f9;padding:5px 9px;border-radius:8px;pointer-events:none'; document.body.appendChild(d); }
+  d.textContent = `kualitas ${QN[FXQ.level]}${FXQ.mode === 'auto' ? ' (otomatis)' : ''} · rata-rata ${mean.toFixed(1)} ms (${Math.round(1000 / mean)} fps) · p75 ${p75.toFixed(1)} · terburuk ${worst.toFixed(0)} ms · partikel maks ${peak}${shed ? ' · pengaman ' + shed : ''}${down ? ' · KUALITAS TURUN' : ''}`;
+};
 const gold = () => Math.max(0, totalXp() * (me.rate || 1) + (me.bonus || 0) - (me.spent || 0));
 const FXL = () => { let z = $('#fxl'); if (!z) { z = document.createElement('div'); z.id = 'fxl'; z.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:98;overflow:hidden'; document.body.appendChild(z); } return z; };
 function part(x, y, o) { // satu partikel DOM (dipakai kilat layar)
@@ -470,29 +502,65 @@ function part(x, y, o) { // satu partikel DOM (dipakai kilat layar)
   p.animate(o.kf, { duration: o.ms, easing: o.e || 'ease-out', delay: o.d || 0, fill: 'forwards' }).onfinish = () => p.remove();
 }
 const cen = r => [r.left + r.width / 2, r.top + r.height / 2];
-const glow = (el, c) => el && el.animate([{ boxShadow: `0 0 70px 26px ${c}, 0 0 26px 8px ${c}` }, { boxShadow: '0 0 0 0 transparent' }], { duration: 1100, easing: 'ease-out' });
+const glow = (el, c) => { // bayangan statis pada lapisan sendiri; yang dianimasikan hanya opasitas (ditangani GPU, tanpa menggambar ulang)
+  const g = Q().glow; if (!el || !g || RM) return;
+  const r = el.getBoundingClientRect(); if (!r.width) return;
+  const d = document.createElement('div');
+  d.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${getComputedStyle(el).borderRadius};pointer-events:none;z-index:97;will-change:opacity;box-shadow:0 0 ${g[0]}px ${g[1]}px ${c},0 0 ${g[1]}px ${Math.round(g[1] * 8 / 26)}px ${c}`;
+  document.body.appendChild(d);
+  d.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1100, easing: 'ease-out' }).onfinish = () => d.remove();
+};
 const flash = c => part(0, 0, { c: `width:100vw;height:100vh;background:${c};`, kf: [{ opacity: 1 }, { opacity: 0 }], ms: 420 });
-const shake = (px, ms) => { if (!RM) V.animate(Array.from({ length: 9 }, (_, i) => ({ transform: `translate(${R(-px, px) * (1 - i / 9)}px,${R(-px, px) * (1 - i / 9)}px)` })).concat([{ transform: 'none' }]), { duration: ms }); };
+const shake = (px0, ms) => { const kq = Q().shake, px = px0 * kq; if (!RM && kq) V.animate(Array.from({ length: 9 }, (_, i) => ({ transform: `translate(${R(-px, px) * (1 - i / 9)}px,${R(-px, px) * (1 - i / 9)}px)` })).concat([{ transform: 'none' }]), { duration: ms }); };
 
 /* Mesin 3D: tiap partikel punya posisi (x,y,z) dan rotasi, diproyeksikan dengan perspektif ke satu kanvas layar penuh,
    lalu digambar dengan cahaya aditif ('lighter') supaya menyala dan menebal. z > 0 = menjauh, z < 0 = mendekat ke layar. */
 const E3 = (() => {
-  const ps = [], F = 640, spr = {}; let cv, cx, W = 0, H = 0, dpr = 1, last = 0, raf = 0;
+  const ps = [], F = 640, spr = {}; let cv, cx, W = 0, H = 0, dpr = 1, last = 0, raf = 0, CAP = 1e9, CULL = 0;
   const rgb = c => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`, rs = c => `${c[0] | 0},${c[1] | 0},${c[2] | 0}`, q = v => Math.min(255, Math.round(v / 24) * 24);
-  const fit = () => { dpr = LITE() ? 1 : Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; };
+  const fit = () => { dpr = Math.min(devicePixelRatio || 1, Q().dpr); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; };
   const sprite = c => { // bola cahaya: inti putih, tepi memudar
     const k = q(c[0]) + ',' + q(c[1]) + ',' + q(c[2]);
     if (!spr[k]) { const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'), r = g.createRadialGradient(48, 48, 0, 48, 48, 48);
       r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.16, `rgba(${k},.95)`); r.addColorStop(.45, `rgba(${k},.38)`); r.addColorStop(1, `rgba(${k},0)`); g.fillStyle = r; g.fillRect(0, 0, 96, 96); spr[k] = s; }
     return spr[k];
   };
+  const sph = {}, cin = {}, pet = {};
+  const sphereSprite = (c, glass) => { // bola: gradien dibuat sekali per warna, bukan tiap frame
+    const cq = [q(c[0]), q(c[1]), q(c[2])], k = (glass ? 'g' : 's') + cq;
+    if (!sph[k]) {
+      const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'), gr = g.createRadialGradient(31.2, 28.8, 1.9, 48, 48, 48);
+      if (glass) { gr.addColorStop(0, 'rgba(255,255,255,.85)'); gr.addColorStop(.25, `rgba(${rs(cq)},.16)`); gr.addColorStop(.85, `rgba(${rs(cq)},.3)`); gr.addColorStop(1, 'rgba(255,255,255,.7)'); }
+      else { gr.addColorStop(0, '#fff'); gr.addColorStop(.3, rgb(cq)); gr.addColorStop(1, rgb(cq.map(v => v * .25))); }
+      g.fillStyle = gr; g.beginPath(); g.arc(48, 48, 48, 0, 7); g.fill(); sph[k] = s;
+    }
+    return sph[k];
+  };
+  const coinFace = () => {
+    if (!cin.f) {
+      const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'), gr = g.createLinearGradient(0, 0, 96, 96);
+      gr.addColorStop(0, '#FFF6B0'); gr.addColorStop(.5, '#FFC400'); gr.addColorStop(1, '#D18A00');
+      g.fillStyle = gr; g.beginPath(); g.arc(48, 48, 48, 0, 7); g.fill();
+      g.strokeStyle = '#FFE98A'; g.lineWidth = 5.8; g.beginPath(); g.arc(48, 48, 33.6, 0, 7); g.stroke(); cin.f = s;
+    }
+    return cin.f;
+  };
+  const petalSprite = c => {
+    const cq = [q(c[0]), q(c[1]), q(c[2])], k = '' + cq;
+    if (!pet[k]) {
+      const s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d'); g.translate(48, 48);
+      const gr = g.createLinearGradient(0, -48, 0, 48); gr.addColorStop(0, '#fff'); gr.addColorStop(.4, rgb(cq)); gr.addColorStop(1, rgb(cq.map(v => v * .8)));
+      g.fillStyle = gr; g.beginPath(); g.moveTo(0, -48); g.bezierCurveTo(43.2, -24, 33.6, 28.8, 0, 48); g.bezierCurveTo(-33.6, 28.8, -43.2, -24, 0, -48); g.fill(); pet[k] = s;
+    }
+    return pet[k];
+  };
   // kristal es: bipiramida segi enam dengan rotasi 3D dan pencahayaan per sisi
   const SH = (() => { const v = [[0, -1.7, 0], [0, 1.7, 0]]; for (let i = 0; i < 6; i++) v.push([Math.cos(i * 1.0472) * .55, 0, Math.sin(i * 1.0472) * .55]); const f = []; for (let i = 0; i < 6; i++) { const a = 2 + i, b = 2 + (i + 1) % 6; f.push([0, a, b], [1, b, a]); } return { v, f }; })();
   const shard = (p, sx, sy, r, c) => {
     const cX = Math.cos(p.rx), sX = Math.sin(p.rx), cY = Math.cos(p.ry), sY = Math.sin(p.ry), cZ = Math.cos(p.rz), sZ = Math.sin(p.rz);
     const P = SH.v.map(([x, y, z]) => { let t = y * cX - z * sX; z = y * sX + z * cX; y = t; t = x * cY + z * sY; z = -x * sY + z * cY; x = t; t = x * cZ - y * sZ; y = x * sZ + y * cZ; x = t; return [x, y, z]; });
-    const fs = SH.f.map(f => { const [A, B, C] = f.map(i => P[i]), nx = (B[1] - A[1]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[1] - A[1]), ny = (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]), nz = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]), L = Math.hypot(nx, ny, nz) || 1; return { f, z: (A[2] + B[2] + C[2]) / 3, l: Math.abs(-nx * .4 - ny * .6 - nz * .7) / L }; }).sort((a, b) => b.z - a.z);
-    for (const o of fs) { const k = .3 + .7 * o.l; cx.fillStyle = rgb([c[0] * k + 40 * o.l, c[1] * k + 30 * o.l, Math.min(255, c[2] * k + 50 * o.l)]); cx.strokeStyle = 'rgba(255,255,255,.6)'; cx.lineWidth = 1; cx.beginPath(); o.f.forEach((i, n) => cx[n ? 'lineTo' : 'moveTo'](sx + P[i][0] * r, sy + P[i][1] * r)); cx.closePath(); cx.fill(); cx.stroke(); }
+    const fs = SH.f.map(f => { const [A, B, C] = f.map(i => P[i]), nx = (B[1] - A[1]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[1] - A[1]), ny = (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]), nz = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]), L = Math.hypot(nx, ny, nz) || 1; return { f, z: (A[2] + B[2] + C[2]) / 3, l: Math.abs(-nx * .4 - ny * .6 - nz * .7) / L, nz }; }).sort((a, b) => b.z - a.z);
+    for (const o of fs) { if (CULL && o.nz > 0) continue; const k = .3 + .7 * o.l; cx.fillStyle = rgb([c[0] * k + 40 * o.l, c[1] * k + 30 * o.l, Math.min(255, c[2] * k + 50 * o.l)]); cx.strokeStyle = 'rgba(255,255,255,.6)'; cx.lineWidth = 1; cx.beginPath(); o.f.forEach((i, n) => cx[n ? 'lineTo' : 'moveTo'](sx + P[i][0] * r, sy + P[i][1] * r)); cx.closePath(); cx.fill(); if (!CULL) cx.stroke(); }
   };
   const draw = p => {
     const u = p.t / p.max, s = Math.min(3.5, F / Math.max(90, F + p.z)), sx = p.ox + p.x * s, sy = p.oy + p.y * s;
@@ -500,7 +568,7 @@ const E3 = (() => {
     if (a < .004) return;
     let c = p.c;
     if (p.ramp) { const n = p.ramp.length - 1, f = Math.min(n - .001, u * n), i = f | 0, m = f - i, A = p.ramp[i], B = p.ramp[i + 1]; c = [A[0] + (B[0] - A[0]) * m, A[1] + (B[1] - A[1]) * m, A[2] + (B[2] - A[2]) * m]; }
-    const r = Math.max(.5, p.sz * s * (1 + p.gr * u)), L = 'lighter', O = 'source-over', al = Math.min(1, a);
+    const r = Math.min(CAP, Math.max(.5, p.sz * s * (1 + p.gr * u))), L = 'lighter', O = 'source-over', al = Math.min(1, a);
     cx.globalAlpha = al; cx.globalCompositeOperation = p.add ? L : O;
     if (p.halo) { cx.globalCompositeOperation = L; cx.globalAlpha = al * .55; cx.drawImage(sprite(c), sx - r * 2.4, sy - r * 2.4, r * 4.8, r * 4.8); cx.globalCompositeOperation = p.add ? L : O; cx.globalAlpha = al; }
     switch (p.k) {
@@ -508,20 +576,14 @@ const E3 = (() => {
       case 'spark': // goresan cahaya mengikuti arah gerak
         cx.strokeStyle = rgb(c); cx.lineCap = 'round'; cx.lineWidth = Math.max(1, r * .6); cx.beginPath(); cx.moveTo(sx - p.vx * s * .05, sy - p.vy * s * .05); cx.lineTo(sx, sy); cx.stroke();
         cx.drawImage(sprite(c), sx - r * 3, sy - r * 3, r * 6, r * 6); break;
-      case 'sphere': {
-        const g = cx.createRadialGradient(sx - r * .35, sy - r * .4, r * .04, sx, sy, r);
-        if (p.glass) { g.addColorStop(0, 'rgba(255,255,255,.85)'); g.addColorStop(.25, `rgba(${rs(c)},.16)`); g.addColorStop(.85, `rgba(${rs(c)},.3)`); g.addColorStop(1, 'rgba(255,255,255,.7)'); }
-        else { g.addColorStop(0, '#fff'); g.addColorStop(.3, rgb(c)); g.addColorStop(1, rgb(c.map(v => v * .25))); }
-        cx.fillStyle = g; cx.beginPath(); cx.arc(sx, sy, r, 0, 7); cx.fill(); break; }
+      case 'sphere': cx.drawImage(sphereSprite(c, p.glass), sx - r, sy - r, r * 2, r * 2); break;
       case 'coin': { // koin berputar 3D: lebar mengecil saat menyamping, ada tebal sisi
         const w = Math.max(.14, Math.abs(Math.cos(p.rx))) * r; cx.save(); cx.translate(sx, sy); cx.rotate(p.rz);
         cx.fillStyle = '#A8730A'; cx.beginPath(); cx.ellipse(r * .1, r * .1, w, r, 0, 0, 7); cx.fill();
-        const g = cx.createLinearGradient(-w, -r, w, r); g.addColorStop(0, '#FFF6B0'); g.addColorStop(.5, '#FFC400'); g.addColorStop(1, '#D18A00'); cx.fillStyle = g; cx.beginPath(); cx.ellipse(0, 0, w, r, 0, 0, 7); cx.fill();
-        cx.strokeStyle = '#FFE98A'; cx.lineWidth = Math.max(1, r * .12); cx.beginPath(); cx.ellipse(0, 0, w * .7, r * .7, 0, 0, 7); cx.stroke(); cx.restore(); break; }
+        cx.drawImage(coinFace(), -w, -r, w * 2, r * 2); cx.restore(); break; }
       case 'petal': {
         cx.save(); cx.translate(sx, sy); cx.rotate(p.rz); cx.scale(Math.abs(Math.cos(p.rx)) * .8 + .2, 1);
-        const g = cx.createLinearGradient(0, -r, 0, r); g.addColorStop(0, '#fff'); g.addColorStop(.4, rgb(c)); g.addColorStop(1, rgb(c.map(v => v * .8)));
-        cx.fillStyle = g; cx.beginPath(); cx.moveTo(0, -r); cx.bezierCurveTo(r * .9, -r * .5, r * .7, r * .6, 0, r); cx.bezierCurveTo(-r * .7, r * .6, -r * .9, -r * .5, 0, -r); cx.fill(); cx.restore(); break; }
+        cx.drawImage(petalSprite(c), -r, -r, r * 2, r * 2); cx.restore(); break; }
       case 'star':
         cx.save(); cx.translate(sx, sy); cx.rotate(p.rz); cx.scale(Math.abs(Math.cos(p.rx)) * .85 + .15, 1);
         for (const [m, col] of [[1, rgb(c)], [.5, '#fff']]) { cx.fillStyle = col; cx.beginPath(); for (let i = 0; i < 8; i++) { const ra = (i % 2 ? .34 : 1) * r * m, an = i * .7854 - 1.5708; cx.lineTo(Math.cos(an) * ra, Math.sin(an) * ra); } cx.closePath(); cx.fill(); }
@@ -539,7 +601,32 @@ const E3 = (() => {
       case 'flash': cx.fillStyle = rgb(c); cx.fillRect(0, 0, W, H); break;
     }
   };
+  const droppable = p => !p.end && p.k !== 'bolt' && p.k !== 'ring'; // yang punya aksi lanjutan (ledakan, tumbukan) dan inti petir tidak disentuh
+  const trim = lv => { // perangkat kewalahan: buang sebagian partikel terbesar
+    const c = ps.filter(droppable).sort((a, b) => (b.k === 'flash') - (a.k === 'flash') || b.sz - a.sz), kill = new Set(c.slice(0, Math.ceil(c.length * .35)));
+    if (lv > 1) c.forEach(p => { if (p.k === 'flash') kill.add(p); });
+    for (let i = ps.length - 1; i >= 0; i--) if (kill.has(ps[i])) ps.splice(i, 1);
+  };
+  let sess = null, shed = 0, slow = 0;
+  const govern = ms => {
+    if (!sess) sess = { ms: [], n: 0, peak: 0, shed: 0 };
+    sess.peak = Math.max(sess.peak, ps.length);
+    if (ms > 250) return; // tab disembunyikan atau jeda panjang, bukan beban efek
+    if (++sess.n > 3) sess.ms.push(ms); // 3 frame pertama diabaikan (pemanasan)
+    if (ms > 28) slow++; else slow = Math.max(0, slow - 1);
+    if (slow >= 3 && shed < 2) { shed++; sess.shed = shed; slow = 0; trim(shed); }
+  };
+  const endSess = () => { // efek selesai: nilai kelancarannya; kalau patah-patah, turunkan kualitas otomatis
+    const s = sess; sess = null; shed = 0; slow = 0;
+    if (!s || s.ms.length < 6) return;
+    const a = s.ms.slice().sort((x, y) => x - y), p75 = a[Math.floor(a.length * .75)], mean = a.reduce((t, x) => t + x, 0) / a.length;
+    const down = (p75 > 28 || s.shed > 0) && FXQ.down();
+    if (FXDBG) dbg(mean, p75, a[a.length - 1], s.peak, s.shed, down);
+    if (down) toast(`Efek disesuaikan ke kualitas <b>${QN[FXQ.level]}</b> agar lancar. Bisa diubah di Profil.`, '⚙️');
+  };
+  const warm = keys => { for (const k of keys) { try { sprite(k.split(',').map(Number)); } catch (e) {} } };
   const frame = dt => {
+    const qq = Q(); CAP = qq.cap; CULL = qq.cull;
     for (let i = ps.length - 1; i >= 0; i--) {
       const p = ps[i]; p.t += dt; if (p.tick) p.tick(p, dt);
       const d = Math.pow(p.dr, dt); p.vx *= d; p.vy *= d; p.vz *= d; p.vy += p.g * dt;
@@ -550,16 +637,17 @@ const E3 = (() => {
     ps.sort((a, b) => b.z - a.z); for (const p of ps) draw(p);
     cx.globalAlpha = 1; cx.globalCompositeOperation = 'source-over';
   };
-  const loop = now => { frame(Math.min(.033, (now - last) / 1000)); last = now; raf = ps.length ? requestAnimationFrame(loop) : 0; };
+  const loop = now => { const ms = now - last; last = now; govern(ms); frame(Math.min(.033, ms / 1000)); if (!ps.length) endSess(); raf = ps.length ? requestAnimationFrame(loop) : 0; };
   const add = p => {
+    if (shed && (p.k || 'glow') !== 'bolt' && (p.k || 'glow') !== 'ring' && !p.end && Math.random() < (shed > 1 ? .7 : .4)) return;
     if (!cv) { cv = document.createElement('canvas'); cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:98'; document.body.appendChild(cv); cx = cv.getContext('2d'); fit(); addEventListener('resize', fit); }
     ps.push(Object.assign({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, g: 0, dr: 1, t: 0, max: 1, sz: 10, c: [255, 255, 255], k: 'glow', a: 1, ad: 1, ai: 0, add: 1, gr: 0, rx: 0, ry: 0, rz: 0, wx: 0, wy: 0, wz: 0, w: 1, glass: 0, halo: 0 }, p));
     if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
   };
-  return { add, step: frame, get n() { return ps.length; } };
+  return { add, step: frame, warm, refit: () => { if (cv) fit(); }, get n() { return ps.length; } };
 })();
 const dir = () => { const u = R(-1, 1), t = R(0, 6.283), r = Math.sqrt(1 - u * u); return [r * Math.cos(t), u, r * Math.sin(t)]; }; // arah acak pada bola
-const flash3 = (c, a, s) => E3.add({ ox: 0, oy: 0, k: 'flash', c, a, max: s, z: -9999, ad: 1.6 });
+const flash3 = (c, a, s) => { const f = Q().flash; if (f) E3.add({ ox: 0, oy: 0, k: 'flash', c, a: a * f, max: s, z: -9999, ad: 1.6 }); };
 const sparks = (ox, oy, n, c, v0, v1, o = {}) => { for (let i = 0; i < N(n); i++) { const [a, b, d] = dir(), v = R(v0, v1); E3.add(Object.assign({ ox, oy, k: 'spark', sz: R(1.6, 3.4), vx: a * v, vy: b * v, vz: d * v, dr: .22, max: R(.6, 1.2), c: Array.isArray(c[0]) ? pick(c) : c }, o)); } };
 
 const FX = {
@@ -664,6 +752,8 @@ const FX = {
     for (let i = 0; i < N(10); i++) E3.add({ ox, oy, k: 'star', halo: 1, sz: R(9, 18), c: pick(CL), max: R(1, 1.6), wx: R(-5, 5), wz: R(-3, 3), x: R(-150, 150), y: R(-70, 70), z: R(-100, 200), ad: .9, ai: .1 });
   },
 };
+const WARM = {"fire":["144,24,0","168,24,0","168,48,0","192,48,0","216,48,0","216,72,0","240,72,0","240,96,0","255,120,24","255,144,24","255,144,48","255,168,48","255,168,72","255,192,48","255,192,72","255,192,96","255,216,120","255,216,144","255,216,96","255,240,144","255,240,168","255,240,192","255,96,0","255,96,24"],"comet":["120,24,0","120,48,0","144,48,0","168,48,0","168,72,0","192,72,0","192,72,24","216,72,24","216,96,24","240,120,24","240,96,24","255,120,24","255,120,48","255,144,48","255,168,48","255,168,72","255,192,72","255,192,96","255,216,120","255,216,144","255,216,168","255,216,96","255,240,144","255,240,168","255,240,192","255,240,216","255,255,240"]}; // warna sprite yang dipakai Api dan Komet, dibuat saat browser menganggur supaya jawaban benar pertama tidak tersendat
+function warmFx() { const k = WARM[me && me.fxa]; if (!k || RM) return; (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => E3.warm(k)); }
 function ansFx(el) { if (!RM) (FX[me.fxa] || FX.confetti)(el.getBoundingClientRect(), el); }
 
 /* ---------- Toko: tampilan ---------- */
@@ -1076,6 +1166,9 @@ async function vProfile() {
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
     ${ADM() ? `<label class="chk"><input type="checkbox" id="pbd"${me.board === false ? '' : ' checked'}> Tampilkan akunku di leaderboard</label>` : ''}<div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
     <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div>
+    <div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di Toko atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
+    <div class="tabs" id="fxq">${[['auto', 'Otomatis'], ['high', 'Tinggi'], ['mid', 'Sedang'], ['low', 'Rendah']].map(([k, t]) => `<button data-fq="${k}" class="${FXQ.mode === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <p class="muted" id="fxqn"></p><button class="btn ghost" id="fxt">Coba efek</button></div>
     <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(cur, pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan efek</button></div></div>
     <div class="card"><h2>Pencapaian (${myFx()}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${AJD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${AJD(j) ? (ADM() ? 'Terbuka (admin)' : 'Semua quest selesai') : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < TS() ? ' on' : ''}" style="--c:${s[1]}"><span>${i < TS() ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>
     <div class="card"><h2>Pencapaian rank (${ADM() ? RANKS.length : ri + 1}/${RANKS.length})</h2><p class="muted">Naik rank dengan mengumpulkan total XP.</p><div class="ach">${RANKS.map((r, n) => { const on = ADM() || n <= ri; return `<div class="ac${on ? ' on' : ''}" style="--c:${r[3]}"><span>${RI(n, 44)}</span><b>${r[1]}</b><small>${on ? (ADM() ? 'Terbuka (admin)' : 'Tercapai') : r[0] + ' XP'}</small></div>`; }).join('')}</div></div>`;
@@ -1088,6 +1181,9 @@ async function vProfile() {
     try { const r = await api('profile', { username: $('#pu').value.trim(), avatar: cur, fx: pk, ...(ADM() ? { board: $('#pbd').checked } : {}) }); me.username = r.username; me.avatar = r.avatar; me.fxp = r.fx; me.board = r.board; renderChip(); toast('Profil disimpan', '✅'); vProfile(); }
     catch (e) { $('#err').textContent = e.message; toast(e.message, '⚠️'); }
   };
+  const qn = () => { $('#fxqn').textContent = 'Sekarang: ' + QN[FXQ.level] + (FXQ.mode === 'auto' ? ' (otomatis)' : ''); };
+  V.querySelectorAll('[data-fq]').forEach(b => b.onclick = () => { FXQ.set(b.dataset.fq); V.querySelectorAll('[data-fq]').forEach(x => x.classList.toggle('on', x === b)); qn(); });
+  $('#fxt').onclick = e => { if (!RM) (FX[me.fxa] || FX.confetti)(e.currentTarget.getBoundingClientRect(), e.currentTarget); }; qn();
   $('#ps').onclick = save; $('#fxs').onclick = save;
   $('#pws').onclick = async () => {
     const o = $('#pwo').value, n = $('#pwn').value, err = $('#perr');
@@ -1196,7 +1292,7 @@ async function adminSoal(box) {
   let st; try { st = await api('admin/stats'); } catch (e) { box.textContent = e.message; return; }
   if (!$('#ab')) return;
   let rows = [];
-  box.innerHTML = `<div class="grid">` + [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2 id="sc${j}">${st.q[j] || 0} soal</h2><p class="muted bablist" id="sb${j}">${babLine(st, j)}</p></div>`).join('') +
+  box.innerHTML = `<div class="grid">` + [1, 2, 3, 4].map(j => `<div class="card jc" style="${jst(j)}"><span class="tag">Jilid ${j}</span><h2 id="sc${j}">${st.q[j] || 0} soal</h2><div class="muted bablist" id="sb${j}">${babLine(st, j)}</div></div>`).join('') +
     `</div><div class="card"><h2>Unggah soal dari Excel</h2><p class="muted">Kolom: <code>jilid, bab, pertanyaan, A, B, C, D, jawaban</code> (jawaban = huruf A–D). Kolom <code>bab</code> boleh kosong atau dihapus; soal tanpa bab tetap dipakai sebagai cadangan acak, sedangkan soal ber-bab diprioritaskan dan kuis berusaha mencakup semua bab.</p>
     <div class="row" style="margin:0 0 12px"><button class="btn ghost" id="tp">Unduh template Excel</button></div>
     <input type="file" id="fl" accept=".xlsx,.xls,.csv">
@@ -1252,7 +1348,7 @@ async function userDetail(id) {
 /* ---------- Admin: kelola soal ---------- */
 let qmJ = 0, qmQ = '', qmOff = 0;
 const QPAGE = 30;
-const babLine = (st, j) => { const a = ((st.babs || {})[j] || []).slice().sort((x, y) => x.bab.localeCompare(y.bab, 'id', { numeric: true })); return a.length ? 'Bab: ' + a.map(x => esc(x.bab) + ' (' + x.n + ')').join(' · ') : 'Belum ada bab, soal diacak'; };
+const babLine = (st, j) => { const a = ((st.babs || {})[j] || []).slice().sort((x, y) => x.bab.localeCompare(y.bab, 'id', { numeric: true })); if (!a.length) return 'Belum ada bab, soal diacak'; return `<details><summary>${a.length} bab · ${a.reduce((t, x) => t + x.n, 0)} soal ber-bab ▾</summary><div class="babchips">${a.map(x => `<span>${esc(x.bab)} <b>${x.n}</b></span>`).join('')}</div></details>`; };
 async function refreshStats() {
   try { const st = await api('admin/stats'); [1, 2, 3, 4].forEach(j => { const e = $('#sc' + j); if (e) e.textContent = (st.q[j] || 0) + ' soal'; const b = $('#sb' + j); if (b) b.innerHTML = babLine(st, j); }); setRep(st.reports || 0); } catch (e) {}
 }
@@ -1406,7 +1502,7 @@ function adminUsers() {
 async function boot() {
   try { me = await api('me'); } catch (e) { tok = null; me = null; try { localStorage.removeItem('tk'); } catch (x) {} }
   document.body.classList.toggle('anon', !me);
-  if (me) { renderChip(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
+  if (me) { renderChip(); warmFx(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
     if (justReg) { justReg = false; openWelcome(g); } else if (g) openGuide(); } else go('auth');
 }
 document.querySelectorAll('.nav[data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
