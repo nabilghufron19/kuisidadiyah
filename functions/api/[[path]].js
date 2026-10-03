@@ -13,7 +13,7 @@ const RANK_MIN = [0, 300, 700, 1200, 1800, 3000];  // batas XP tiap rank (harus 
 const RANK_PAY = [50, 100, 150, 200, 250, 300];    // Gold harian per rank: Bronze, Silver, Gold, Platinum, Diamond, Legend
 const GRANTED = new Map();                         // uid -> hari (WIB) bonus rank sudah diperiksa; menghemat satu query per /me
 const wibDay = () => new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10);
-const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600, fire: 900, ice: 1100, lightning: 1500, comet: 2000, galaxy: 2800 };
+const SHOP = { stars: 100, bubbles: 200, petals: 300, tear: 250, coins: 450, fireworks: 600, bricks: 500, fire: 900, ice: 1100, glass: 1000, blast: 1300, lightning: 1500, comet: 2000, dust: 1800, galaxy: 2800, hole: 3200 };
 // Toko: gaya nama di leaderboard (kunci diawali n_). Disimpan di purchases seperti efek jawaban; yang terpasang ada di users.fxn.
 const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimmer: 600, n_neon: 800, n_blaze: 1100, n_frost: 1300, n_glitch: 2000, n_rainbow: 2500 };
 const PRICES = { ...SHOP, ...NSHOP };
