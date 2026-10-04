@@ -322,6 +322,9 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .rpt:disabled{opacity:.6;cursor:default}
 .rkinds label{display:flex;gap:10px;align-items:center;margin:6px 0;cursor:pointer}.rkinds input{width:auto;margin:0}
 .bablist{margin:6px 0 0;font-size:.8rem}.bablist summary{cursor:pointer;font-weight:600;color:var(--accent);list-style:none}.bablist summary::-webkit-details-marker{display:none}.babchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.babchips span{background:var(--soft);border-radius:999px;padding:1px 10px;font-size:.76rem}.babchips b{opacity:.75;margin-left:2px}
+/* foto pribadi */
+.av.ph{background:var(--soft)!important;overflow:hidden}.av.ph img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover}
+.phrow{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.phrow .acts{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -1082,8 +1085,13 @@ const AVS = [['🦁', '#F5A31A'], ['🦅', '#2BA3E6'], ['🐪', '#D2A15B'], ['�
 /* Efek foto: level efek = jumlah pencapaian (0-11). Tier 1: cincin (1-3) · 2: cincin berputar + cahaya (4-6) · 3: + titik mengorbit (7-10) · 4: emas + mahkota (11, Takhossus) */
 const FXC = [['#2EAD5C', '#2EAD5C'], ['#2BA3E6', '#2BA3E6'], ['#A94BC0', '#A94BC0'], ['#F5A31A', '#C5DA2B'], ['#22A052', '#7CFFA8'], ['#2B8FE0', '#7CD3FF'], ['#A44FD0', '#E0A0FF'], ['#F08A1E', '#FFD27A'], ['#E24B3B', '#FF9A8A'], ['#E0367A', '#FF8FC0'], ['#F2B705', '#FFF3B0']];
 const fxTier = n => n < 4 ? 1 : n < 7 ? 2 : n < 11 ? 3 : 4;
+/* Kunci foto pribadi: 'p<versi>:<username>' (mis. p1759560000:budi). Kunci emoji tetap 'a1'..'a12'. */
+const pkey = (un, v) => 'p' + v + ':' + un;
+const myAv = () => me.usePhoto && me.photo ? pkey(me.username, me.photo) : me.avatar;
 const avBase = (k, sz = '', fx = 0) => {
-  const a = AVS[(parseInt(String(k || 'a1').slice(1)) - 1) || 0], e = `<span class="av ${sz}" style="background:${a[1]}">${a[0]}</span>`;
+  const pm = /^p(\d+):([A-Za-z0-9_]+)$/.exec(String(k || ''));
+  const a = AVS[(parseInt(String(k || 'a1').slice(1)) - 1) || 0],
+    e = pm ? `<span class="av ${sz} ph"><img src="/api/photo?u=${pm[2]}&v=${pm[1]}" alt="" decoding="async" draggable="false"></span>` : `<span class="av ${sz}" style="background:${a[1]}">${a[0]}</span>`;
   if (!(fx > 0)) return e;
   const n = Math.min(fx, 11), f = FXC[n - 1];
   return `<span class="avw ${sz} t${fxTier(n)} fx${n}" style="--c1:${f[0]};--c2:${f[1]}">${e}${n === 11 ? '<i class="crn">👑</i>' : ''}</span>`;
@@ -1107,7 +1115,7 @@ const fxGrid = (k, pk) => {
 const STG = [['Tathbiq 1', '#1A7A3C', '📘'], ['Tathbiq 2', '#1573C4', '📗'], ['Tathbiq 3', '#7B2FA0', '📙'], ['Tathbiq 4', '#D9730D', '📕'], ['Tathbiq 5', '#C0392B', '📒'], ['Tathbiq 6', '#B3245B', '📚'], ['Takhossus', '#F2B705', '👑']];
 const stg = n => STG[Math.min(Math.ceil(n / 10), 7) - 1];
 const stgStyle = n => `background:${stg(n)[1]};color:${Math.ceil(n / 10) > 6 ? '#1a1a1a' : '#fff'}`;
-const renderChip = () => { $('#who').innerHTML = av(me.avatar, '', myFx()) + '<span>' + nm(me.username, me.fxn) + '</span>'; };
+const renderChip = () => { $('#who').innerHTML = av(myAv(), '', myFx()) + '<span>' + nm(me.username, me.fxn) + '</span>'; };
 function toast(msg, ico = '🔔') {
   const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<span>${ico}</span><div>${msg}</div>`;
   $('#toasts').appendChild(t); setTimeout(() => t.remove(), 5200);
@@ -1125,7 +1133,7 @@ const GUIDE = {
     <li><b>Leaderboard</b> mengurutkan murid berdasarkan total XP. Bisa disaring per jilid, ada tab Tathbiq, dan ada kolom cari nama.</li>
     <li>Quest selesai bila benar minimal <b>60%</b>. Nilainya bertingkat: Lulus (60%+), Jayyid (75%+), Mumtaz (90%+), Sempurna (100%), dan tampil di tiap level. Jilid yang ketiga levelnya Sempurna bertanda 💯.</li>
     <li>Level bertanda nilai berarti quest selesai. Selesaikan ketiga level sebuah jilid untuk meraih <b>pencapaian jilid</b> itu. Setelah keempat jilid selesai, <b>Mode Tathbiq</b> terbuka.</li>
-    <li>Di <b>Profil</b> kamu bisa mengganti username, foto, dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
+    <li>Di <b>Profil</b> kamu bisa mengganti username, foto (emoji atau foto pribadi dari galeri yang otomatis dikompres), dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
     <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
@@ -1158,30 +1166,103 @@ function openWelcome(thenGuide) {
   document.body.appendChild(m);
   m.querySelector('#wx').onclick = () => { m.remove(); if (thenGuide) openGuide(); };
 }
+/* ---------- Kompresi foto pribadi (dikerjakan di perangkat murid, sebelum diunggah) ----------
+   Tujuan: sekecil mungkin tapi tetap tajam di bingkai terbesar (84 px; layar 2x = 168 px), jadi dimulai dari 192 px.
+   1) Orientasi EXIF dikoreksi, lalu dipotong persegi. Foto potret: pusat potong dinaikkan ke 35% tinggi agar wajah tidak terpotong.
+   2) Diperkecil bertahap (dibagi dua tiap langkah, baru langkah akhir ke ukuran target) supaya tepi tidak bergerigi.
+   3) Latar diisi warna netral (menghapus kanal alfa PNG), lalu di-encode WebP (JPEG bila browser tak bisa encode WebP, mis. Safari lama).
+   4) Pencarian biner (5 langkah): kualitas tertinggi yang hasilnya masih <= PH_TARGET byte. Jika kualitas minimum pun masih
+      melebihi target, turun ke ukuran berikutnya: 192 -> 160 -> 128 -> 96 px.
+   Hasil umum: 4-9 KB per foto (aplikasi ini tak pernah menyimpan foto asli). */
+const PH_TARGET = 9000, PH_SIZES = [192, 160, 128, 96], PH_QMIN = .5, PH_QMAX = .9;
+async function loadImg(f) {
+  if (window.createImageBitmap) { try { return await createImageBitmap(f, { imageOrientation: 'from-image' }); } catch (e) {} }
+  const u = URL.createObjectURL(f);
+  try { const i = new Image(); i.src = u; await i.decode(); return i; } finally { URL.revokeObjectURL(u); }
+}
+async function compressPhoto(file) {
+  if (!/^image\//.test(file.type)) throw new Error('Pilih file gambar (JPG, PNG, atau WebP)');
+  if (file.size > 20 * 1048576) throw new Error('Foto terlalu besar (maksimal 20 MB)');
+  let img; try { img = await loadImg(file); } catch (e) { throw new Error('Foto tidak bisa dibaca. Coba format JPG, PNG, atau WebP.'); }
+  const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height, s = Math.min(W, H);
+  if (s < 64) throw new Error('Foto terlalu kecil (minimal 64 px)');
+  const sx = (W - s) / 2, sy = (H - s) * (H > W ? .35 : .5);
+  const mk = n => { const c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; return [c, g]; };
+  const type = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+  const blobAt = (c, q) => new Promise(ok => c.toBlob(ok, type, q));
+  let best = null, last = null;
+  for (const size of PH_SIZES) {
+    let src = img, x = sx, y = sy, w = s;
+    while (w / 2 >= size) { const n = Math.ceil(w / 2), [c, g] = mk(n); g.drawImage(src, x, y, w, w, 0, 0, n, n); src = c; x = y = 0; w = n; }
+    const [c, g] = mk(size); g.fillStyle = '#eef3ef'; g.fillRect(0, 0, size, size); g.drawImage(src, x, y, w, w, 0, 0, size, size);
+    let pick = await blobAt(c, PH_QMAX);
+    if (pick && pick.size > PH_TARGET) {
+      const lo0 = await blobAt(c, PH_QMIN);
+      if (!lo0 || lo0.size > PH_TARGET) { last = { b: lo0, size }; pick = null; }
+      else { pick = lo0; let lo = PH_QMIN, hi = PH_QMAX; for (let i = 0; i < 5; i++) { const mid = (lo + hi) / 2, m = await blobAt(c, mid); if (m && m.size <= PH_TARGET) { pick = m; lo = mid; } else hi = mid; } }
+    }
+    if (pick) { best = { b: pick, size }; break; }
+  }
+  if (img.close) img.close();
+  best = best || last;
+  if (!best || !best.b || best.b.size > 24000) throw new Error('Foto tidak bisa dikompres cukup kecil. Coba foto lain.');
+  const b64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(best.b); });
+  return { b64, size: best.size, bytes: best.b.size };
+}
 async function vProfile() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   try { Object.assign(me, await api('me')); } catch (e) { V.textContent = e.message; return; }
   const xp = Object.values(me.best).reduce((a, b) => a + b, 0), ri = RANKS.reduce((a, r, n) => xp >= r[0] ? n : a, 0);
-  let cur = me.avatar || 'a1', pk = me.fxp == null ? null : me.fxp;
-  V.innerHTML = `<div class="card prof"><div id="pav">${av(cur, 'lg', fxOf(pk))}</div><div><h1>${nm(me.username, me.fxn)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
+  let cur = me.avatar || 'a1', pk = me.fxp == null ? null : me.fxp, ph = me.photo || null, usePh = !!(ph && me.usePhoto);
+  const dk = () => usePh && ph ? pkey(me.username, ph) : cur; // kunci avatar yang sedang dipilih (foto atau emoji)
+  V.innerHTML = `<div class="card prof"><div id="pav">${av(dk(), 'lg', fxOf(pk))}</div><div><h1>${nm(me.username, me.fxn)}</h1><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
     <p class="muted">${xp} XP · Rekor Tathbiq ${me.best['0:endless'] || 0} XP</p></div></div>
-    <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Pilih foto:</p>
+    <div class="card"><h2>Foto pribadi</h2><div class="phrow"><div id="phprev"></div><div><p class="muted" id="phinfo" style="margin:0 0 10px"></p>
+      <div class="acts"><button class="btn" id="phpick">Pilih foto</button><button class="btn ghost" id="phuse" hidden>Pakai foto ini</button><button class="btn ghost del" id="phdel" hidden>Hapus foto</button></div></div></div>
+      <input type="file" id="phf" accept="image/*" hidden><div class="err" id="pherr" style="margin-top:8px"></div>
+      <p class="muted" style="margin:0;font-size:.85rem">Foto dipotong persegi dan dikecilkan otomatis di perangkatmu (hanya ±4–9 KB yang diunggah, foto aslinya tidak disimpan). Foto tampil publik di leaderboard, jadi pakai foto yang sopan. Admin bisa menghapus foto yang tidak pantas.</p></div>
+    <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Atau pilih foto emoji:</p>
     <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
     ${ADM() ? `<label class="chk"><input type="checkbox" id="pbd"${me.board === false ? '' : ' checked'}> Tampilkan akunku di leaderboard</label>` : ''}<div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
     <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div>
     <div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di Toko atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
     <div class="tabs" id="fxq">${[['auto', 'Otomatis'], ['high', 'Tinggi'], ['mid', 'Sedang'], ['low', 'Rendah']].map(([k, t]) => `<button data-fq="${k}" class="${FXQ.mode === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <p class="muted" id="fxqn"></p><button class="btn ghost" id="fxt">Coba efek</button></div>
-    <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(cur, pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan efek</button></div></div>
+    <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(dk(), pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan efek</button></div></div>
     <div class="card"><h2>Pencapaian (${myFx()}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${AJD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${AJD(j) ? (ADM() ? 'Terbuka (admin)' : 'Semua quest selesai') : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < TS() ? ' on' : ''}" style="--c:${s[1]}"><span>${i < TS() ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>
     <div class="card"><h2>Pencapaian rank (${ADM() ? RANKS.length : ri + 1}/${RANKS.length})</h2><p class="muted">Naik rank dengan mengumpulkan total XP.</p><div class="ach">${RANKS.map((r, n) => { const on = ADM() || n <= ri; return `<div class="ac${on ? ' on' : ''}" style="--c:${r[3]}"><span>${RI(n, 44)}</span><b>${r[1]}</b><small>${on ? (ADM() ? 'Terbuka (admin)' : 'Tercapai') : r[0] + ' XP'}</small></div>`; }).join('')}</div></div>`;
+  const phUI = () => {
+    $('#phprev').innerHTML = av(dk(), 'lg');
+    $('#phinfo').textContent = ph ? (usePh ? '✅ Foto pribadi sedang dipakai.' : 'Foto tersimpan tapi belum dipakai (kamu memilih foto emoji).') : 'Belum ada foto pribadi.';
+    $('#phpick').textContent = ph ? 'Ganti foto' : 'Pilih foto';
+    $('#phdel').hidden = !ph; $('#phuse').hidden = !(ph && !usePh);
+  };
   const refresh = () => {
-    $('#pav').innerHTML = av(cur, 'lg', fxOf(pk)); $('#fxg').innerHTML = fxGrid(cur, pk);
+    $('#pav').innerHTML = av(dk(), 'lg', fxOf(pk)); $('#fxg').innerHTML = fxGrid(dk(), pk); phUI();
     $('#fxg').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { pk = b.dataset.f === 'auto' ? null : +b.dataset.f; refresh(); });
   };
-  V.querySelectorAll('.avb').forEach(b => b.onclick = () => { cur = b.dataset.a; V.querySelectorAll('.avb').forEach(x => x.classList.toggle('on', x === b)); refresh(); });
+  V.querySelectorAll('.avb').forEach(b => b.onclick = () => { cur = b.dataset.a; usePh = false; V.querySelectorAll('.avb').forEach(x => x.classList.toggle('on', x === b)); refresh(); });
+  const phErr = m => { $('#pherr').textContent = m || ''; };
+  $('#phpick').onclick = () => $('#phf').click();
+  $('#phf').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const b = $('#phpick'); b.disabled = true; b.textContent = 'Memproses…'; phErr();
+    try {
+      const c = await compressPhoto(f), r = await api('photo', { data: c.b64 });
+      me.photo = ph = r.photo; me.usePhoto = usePh = true;
+      renderChip(); refresh(); toast(`Foto tersimpan: ${(r.bytes / 1024).toFixed(1)} KB (${c.size}×${c.size} px)`, '📷');
+    } catch (x) { phErr(x.message); }
+    finally { b.disabled = false; phUI(); }
+  };
+  $('#phuse').onclick = async () => {
+    try { await api('profile', { usePhoto: true }); me.usePhoto = usePh = true; renderChip(); refresh(); phErr(); } catch (x) { phErr(x.message); }
+  };
+  $('#phdel').onclick = async () => {
+    if (!confirm('Hapus foto pribadimu?')) return;
+    try { await api('photo/delete', {}); me.photo = ph = null; me.usePhoto = usePh = false; renderChip(); refresh(); phErr(); toast('Foto dihapus', '🗑️'); } catch (x) { phErr(x.message); }
+  };
   const save = async () => {
-    try { const r = await api('profile', { username: $('#pu').value.trim(), avatar: cur, fx: pk, ...(ADM() ? { board: $('#pbd').checked } : {}) }); me.username = r.username; me.avatar = r.avatar; me.fxp = r.fx; me.board = r.board; renderChip(); toast('Profil disimpan', '✅'); vProfile(); }
+    try { const r = await api('profile', { username: $('#pu').value.trim(), avatar: cur, fx: pk, usePhoto: usePh, ...(ADM() ? { board: $('#pbd').checked } : {}) }); me.username = r.username; me.avatar = r.avatar; me.fxp = r.fx; me.board = r.board; me.usePhoto = r.usePhoto; renderChip(); toast('Profil disimpan', '✅'); vProfile(); }
     catch (e) { $('#err').textContent = e.message; toast(e.message, '⚠️'); }
   };
   const qn = () => { $('#fxqn').textContent = 'Sekarang: ' + QN[FXQ.level] + (FXQ.mode === 'auto' ? ' (otomatis)' : ''); };
@@ -1217,7 +1298,7 @@ async function vBoard(j = 0) {
       if (my !== seq) return;
       const box = $('#lbr');
       box.classList.toggle('nofx', !first);
-      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.total > 0 && r.rank <= 3 ? ' top' + r.rank : ''}${nc(r.nm) ? ' hasnm' : ''}" data-u="${esc(r.username)}" data-rk="${r.rank}" tabindex="0" role="button" title="Lihat profil" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.avatar, '', r.fx, r.total > 0 && r.rank <= 3 ? r.rank : 0)}<span${nc(r.nm) ? ' class="' + nc(r.nm) + '"' : ''}>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
+      box.innerHTML = d.rows.length ? d.rows.map((r, n) => `<div class="lrow${r.username === me.username ? ' me' : ''}${r.total > 0 && r.rank <= 3 ? ' top' + r.rank : ''}${nc(r.nm) ? ' hasnm' : ''}" data-u="${esc(r.username)}" data-rk="${r.rank}" tabindex="0" role="button" title="Lihat profil" style="--i:${Math.min(n, 12)}"><span class="rk r${r.rank}">${r.rank < 4 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span><b class="un">${av(r.ph ? pkey(r.username, r.ph) : r.avatar, '', r.fx, r.total > 0 && r.rank <= 3 ? r.rank : 0)}<span${nc(r.nm) ? ' class="' + nc(r.nm) + '"' : ''}>${esc(r.username)}</span></b><span class="muted" style="margin:0">${j === 5 ? '📚' : r.jilids + ' jilid'}</span><b>${r.total} XP</b></div>`).join('')
         : `<p class="muted">${bq ? 'Tidak ada murid bernama "' + esc(bq) + '".' : 'Belum ada nilai.'}</p>`;
       box.onclick = e => { const r = e.target.closest('.lrow'); if (r) openPlayer(r.dataset.u, j === 0 ? +r.dataset.rk : 0); };
       box.onkeydown = e => { if (e.key === 'Enter' && e.target.classList.contains('lrow')) e.target.click(); };
@@ -1239,7 +1320,7 @@ async function openPlayer(un, rk) {
   let d; try { d = await api('player?u=' + encodeURIComponent(un)); } catch (e) { toast(e.message, '⚠️'); return; }
   const ri = d.admin ? RANKS.length - 1 : rkOf(d.total), ts = d.tstage, done = d.ach, nj = done.filter(Boolean).length, own = new Set(d.owned);
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="box pbox"><div class="pl"><div>${av(d.avatar, 'lg', d.fx)}</div><div><h2>${nm(d.username, d.nm)}</h2>
+  m.innerHTML = `<div class="box pbox"><div class="pl"><div>${av(d.ph ? pkey(d.username, d.ph) : d.avatar, 'lg', d.fx)}</div><div><h2>${nm(d.username, d.nm)}</h2>
       <span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>${d.admin ? ' <span class="tag">🛡️ Admin</span>' : ''}
       <p class="muted" style="margin:6px 0 0">${rk ? 'Peringkat #' + rk + ' · ' : ''}bergabung ${new Date(d.since).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p></div></div>
     <div class="pst"><div><b>${d.total}</b><small>Total XP</small></div><div><b>${nj}/4</b><small>Jilid khatam</small></div><div><b>${d.best['0:endless'] || 0}</b><small>Rekor Tathbiq</small></div></div>
@@ -1342,10 +1423,13 @@ async function userDetail(id) {
     <p class="muted">${tot} XP · bergabung ${new Date(u.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
     ${[1, 2, 3, 4].map(j => `<div class="urow"><span class="tag" style="margin:0;background:${JC[j][0]};color:${JC[j][2]}">Jilid ${j}</span><span class="muted" style="margin:0;text-align:right;font-size:.88rem">${Object.entries(LV).map(([k, [nm, , x]]) => { const v = b[j + ':' + k] || 0; return nm + ' ' + v + '/' + x + (v >= x * PASS() / 100 ? ' ✅' : ''); }).join(' · ')}</span></div>`).join('')}
     <div class="urow"><b>📚 Tathbiq</b><span class="muted" style="margin:0">Rekor ${b['0:endless'] || 0} XP · tahap ${d.tstage ? STG[d.tstage - 1][0] : '-'}</span></div>
+    ${u.photo_v ? `<div class="urow"><span style="display:flex;align-items:center;gap:10px">${u.use_photo ? av(pkey(u.username, u.photo_v), 'md') : '📷'} <b>Foto pribadi</b></span><button class="btn ghost del" id="udph">Hapus foto</button></div>` : ''}
     <h2 style="margin-top:14px">10 percobaan terakhir</h2>${d.recent.length ? d.recent.map(r => `<div class="urow"><span>${r.level === 'endless' ? '📚 Tathbiq' : 'Jilid ' + r.jilid + ' · ' + LV[r.level][0]}</span><span class="muted" style="margin:0;text-align:right;font-size:.88rem">${r.level === 'endless' ? r.score + ' XP' : r.correct + '/' + r.total + ' benar · nilai ' + r.score} · ${ago(r.created_at)}</span></div>`).join('') : '<p class="muted">Belum ada percobaan.</p>'}
     <div class="row"><span></span><button class="btn" id="udx">Tutup</button></div></div>`;
   document.body.appendChild(m);
-  const close = () => m.remove(); m.querySelector('#udx').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+  const close = () => m.remove(); m.querySelector('#udx').onclick = close;
+  const dp = m.querySelector('#udph');
+  if (dp) dp.onclick = async () => { if (!confirm('Hapus foto pribadi "' + u.username + '"?')) return; try { await api('admin/photo-delete', { id: u.id }); dp.closest('.urow').remove(); toast('Foto dihapus', '🗑️'); } catch (e) { alert(e.message); } }; m.onclick = e => { if (e.target === m) close(); };
 }
 
 /* ---------- Admin: kelola soal ---------- */
