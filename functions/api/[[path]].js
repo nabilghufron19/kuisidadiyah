@@ -27,6 +27,15 @@ const LB = new Map(), LB_TTL = 10000; // cache leaderboard per isolate (hasilnya
 const REPORT_DAY = 30;                   // maksimal laporan soal per murid per hari
 const REPORT_KINDS = ['kunci', 'ketik', 'ambigu', 'lain'];
 const babOf = x => String(x ?? '').trim().replace(/\s+/g, ' ');
+const PHOTO_MAX = 24000;                  // batas keras foto profil (byte). Klien menargetkan ~9 KB, jadi ini hanya pagar pengaman.
+const PHOTO_EDGE_S = 86400;               // umur cache di edge Cloudflare (detik); browser menyimpan setahun karena URL memuat versi
+// Periksa isi file sebenarnya (bukan header kiriman klien): hanya WebP atau JPEG yang utuh.
+const photoMime = u => {
+  const n = u.length, s = (i, t) => [...t].every((c, k) => u[i + k] === c.charCodeAt(0));
+  if (n > 12 && s(0, 'RIFF') && s(8, 'WEBP') && (u[4] | u[5] << 8 | u[6] << 16 | u[7] << 24) + 8 === n) return 'image/webp';
+  if (n > 4 && u[0] === 0xFF && u[1] === 0xD8 && u[2] === 0xFF && u[n - 2] === 0xFF && u[n - 1] === 0xD9) return 'image/jpeg';
+  return null;
+};
 const PW_MAX = 128;                       // batas panjang password (mencegah PBKDF2 pada input raksasa)
 const LOGIN_MAX = 8, LOGIN_MIN = 15;      // maksimal 8 kali gagal per username dalam 15 menit
 const DUMMY_SALT = new Uint8Array(16);    // dipakai bila username tidak ada, supaya waktu respons sama
@@ -53,7 +62,7 @@ async function hash(pw, salt) {
   return b64(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, k, 256));
 }
 
-export async function onRequest({ request, env, params }) {
+export async function onRequest({ request, env, params, waitUntil }) {
   const sql = neon(env.DATABASE_URL), S = env.JWT_SECRET, url = new URL(request.url);
   const route = request.method + ' ' + [].concat(params.path || []).join('/');
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
@@ -83,6 +92,20 @@ export async function onRequest({ request, env, params }) {
       order by nb, rk, random() limit ${n}) s order by random()`;
 
   try {
+    // ---------- Foto profil (publik: dipanggil lewat <img>, yang tidak bisa mengirim header Authorization) ----------
+    // URL memuat versi (?v=), jadi tiap unggahan baru = URL baru. Browser menyimpannya setahun; edge Cloudflare sehari (hemat compute Neon).
+    if (route === 'GET photo') {
+      const un = (url.searchParams.get('u') || '').trim().slice(0, 30), cache = caches.default;
+      const hit = await cache.match(request);
+      if (hit) return hit;
+      const [p] = un ? await sql`select encode(p.data, 'base64') d, p.mime from user_photos p join users u on u.id = p.user_id where lower(u.username) = lower(${un}) and u.use_photo` : [];
+      if (!p) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'public, max-age=60' } });
+      const h = { 'Content-Type': p.mime, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'" };
+      const bytes = Uint8Array.from(atob(p.d), c => c.charCodeAt(0));
+      if (waitUntil) waitUntil(cache.put(request, new Response(bytes, { headers: { ...h, 'Cache-Control': 'public, max-age=' + PHOTO_EDGE_S } })));
+      return new Response(bytes, { headers: { ...h, 'Cache-Control': 'public, max-age=31536000, immutable' } });
+    }
+
     // ---------- Daftar & masuk ----------
     if (route === 'POST register') {
       const un = String(body.username || ''), pw = String(body.password || '');
@@ -119,7 +142,7 @@ export async function onRequest({ request, env, params }) {
     const uid = claim && claim.k === 'auth' ? +claim.uid : 0;
     if (!uid) return bad('Silakan masuk dulu', 401);
     let cachedUser;
-    const getUser = async () => cachedUser ||= (await sql`select id, username, role, avatar, fx, on_board from users where id = ${uid}`)[0] || null;
+    const getUser = async () => cachedUser ||= (await sql`select id, username, role, avatar, fx, on_board, photo_v, use_photo from users where id = ${uid}`)[0] || null;
 
     if (route === 'GET me') {
       // Bonus Gold harian sesuai rank: sekali sehari (WIB), otomatis saat murid membuka aplikasi. Gagal di sini tidak boleh menggagalkan /me.
@@ -143,7 +166,7 @@ export async function onRequest({ request, env, params }) {
       } catch (e) { got = 0; }
       // satu round trip untuk tiga query
       const [[usr], best, [t], [sp], [bn], [rq]] = await sql.transaction([
-        sql`select username, role, avatar, fx, fxa, fxn, on_board from users where id = ${uid}`,
+        sql`select username, role, avatar, fx, fxa, fxn, on_board, photo_v, use_photo from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
         sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
@@ -152,7 +175,7 @@ export async function onRequest({ request, env, params }) {
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
       const xpTot = best.reduce((a, r) => a + r.xp, 0), ri = Math.max(0, RANK_MIN.filter(m => m <= xpTot).length - 1);
-      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -286,10 +309,39 @@ export async function onRequest({ request, env, params }) {
       const [dup, best, st] = await sql.transaction(qs);
       if (dup.length) return bad('Username sudah dipakai', 409);
       if (needFx && fx > jilidDone(best).filter(Boolean).length + st[0].s) return bad('Efek ini belum terbuka', 403);
-      try { await sql`update users set username = ${un}, avatar = ${av}, fx = ${fx}, on_board = ${ob} where id = ${u.id}`; }
+      const up = typeof body.usePhoto === 'boolean' ? body.usePhoto && u.photo_v != null : u.use_photo; // foto hanya bisa dipakai bila sudah diunggah
+      try { await sql`update users set username = ${un}, avatar = ${av}, fx = ${fx}, on_board = ${ob}, use_photo = ${up} where id = ${u.id}`; }
       catch (e) { if (e.code === '23505') return bad('Username sudah dipakai', 409); throw e; }
       LB.clear();
-      return J({ username: un, avatar: av, fx, board: ob });
+      return J({ username: un, avatar: av, fx, board: ob, usePhoto: up });
+    }
+
+    // ---------- Foto pribadi ----------
+    // Klien sudah memotong persegi, mengecilkan, dan mengompres (WebP/JPEG, ~9 KB). Server hanya memverifikasi isinya lalu menyimpan
+    // satu baris per murid (upsert), jadi pemakaian Neon dibatasi: murid x PHOTO_MAX byte.
+    if (route === 'POST photo') {
+      const s = String(body.data || '');
+      if (!s || s.length > Math.ceil(PHOTO_MAX / 3) * 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(s)) return bad('Foto tidak valid');
+      let raw; try { raw = Uint8Array.from(atob(s), c => c.charCodeAt(0)); } catch { return bad('Foto tidak valid'); }
+      const mime = raw.length <= PHOTO_MAX ? photoMime(raw) : null;
+      if (!mime) return bad('Foto harus berupa WebP atau JPEG utuh, maksimal ' + Math.round(PHOTO_MAX / 1000) + ' KB');
+      const [cd] = await sql`select 1 from user_photos where user_id = ${uid}::int and updated_at > now() - interval '5 seconds'`;
+      if (cd) return bad('Tunggu sebentar sebelum mengunggah lagi', 429);
+      // versi = detik epoch: tidak pernah berulang walau foto dihapus lalu diunggah lagi, sehingga cache lama tidak tertukar
+      const [, [r]] = await sql.transaction([
+        sql`insert into user_photos (user_id, data, mime, updated_at) values (${uid}::int, decode(${s}::text, 'base64'), ${mime}::text, now())
+          on conflict (user_id) do update set data = excluded.data, mime = excluded.mime, updated_at = now()`,
+        sql`update users set photo_v = extract(epoch from now())::int, use_photo = true where id = ${uid}::int returning photo_v`]);
+      if (!r) return bad('Silakan masuk dulu', 401);
+      LB.clear();
+      return J({ photo: r.photo_v, bytes: raw.length });
+    }
+    if (route === 'POST photo/delete') {
+      await sql.transaction([
+        sql`delete from user_photos where user_id = ${uid}::int`,
+        sql`update users set photo_v = null, use_photo = false where id = ${uid}::int`]);
+      LB.clear();
+      return J({ ok: true });
     }
 
     // ---------- Laporan soal salah (murid -> admin) ----------
@@ -406,8 +458,9 @@ export async function onRequest({ request, env, params }) {
           from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
           select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick, u.fxn as nm,
+                 case when u.use_photo then u.photo_v end as ph,
                  sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
-          from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx, u.fxn)
+          from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx, u.fxn, u.photo_v, u.use_photo)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
         order by rank, username limit 100`;
@@ -432,7 +485,7 @@ export async function onRequest({ request, env, params }) {
     // Hanya data publik: XP, pencapaian, efek foto, dan koleksi item. Gold, riwayat percobaan, dan data akun TIDAK dikirim.
     if (route === 'GET player') {
       const un = (url.searchParams.get('u') || '').trim().slice(0, 30);
-      const [t] = un ? await sql`select id, username, role, avatar, fx, fxa, fxn, on_board, created_at from users where lower(username) = lower(${un})` : [];
+      const [t] = un ? await sql`select id, username, role, avatar, fx, fxa, fxn, on_board, created_at, photo_v, use_photo from users where lower(username) = lower(${un})` : [];
       if (!t || (t.role === 'admin' && !t.on_board)) return bad('Pemain tidak ditemukan', 404);
       const [best, [en], own] = await sql.transaction([
         bestOf(t.id),
@@ -441,7 +494,7 @@ export async function onRequest({ request, env, params }) {
       const admin = t.role === 'admin', ach = admin ? [true, true, true, true] : jilidDone(best);
       const mx = admin ? 11 : ach.filter(Boolean).length + en.s;
       return J({
-        username: t.username, admin, avatar: t.avatar, since: t.created_at,
+        username: t.username, admin, avatar: t.avatar, ph: t.use_photo ? t.photo_v : null, since: t.created_at,
         fx: t.fx == null ? mx : Math.min(t.fx, mx),
         total: best.reduce((a, r) => a + r.xp, 0), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])),
         ach, tstage: admin ? 7 : en.s, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: t.fxa, nm: t.fxn
@@ -583,12 +636,23 @@ export async function onRequest({ request, env, params }) {
     if (route === 'GET admin/user') {
       const id = +url.searchParams.get('id') || 0;
       const [[t], best, recent, [en]] = await sql.transaction([
-        sql`select id, username, role, created_at from users where id = ${id}`,
+        sql`select id, username, role, created_at, photo_v, use_photo from users where id = ${id}`,
         bestOf(id),
         sql`select jilid, level, correct, total, score, created_at from attempts where user_id = ${id} order by created_at desc limit 10`,
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int s from endless_runs where user_id = ${id}`]);
       if (!t) return bad('Pengguna tidak ditemukan', 404);
       return J({ user: t, best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])), recent, tstage: en.s });
+    }
+
+    // Moderasi: admin bisa menghapus foto pribadi murid (foto tampil publik di leaderboard).
+    if (route === 'POST admin/photo-delete') {
+      const id = +body.id;
+      if (!Number.isInteger(id) || id < 1) return bad('ID tidak valid');
+      await sql.transaction([
+        sql`delete from user_photos where user_id = ${id}::int`,
+        sql`update users set photo_v = null, use_photo = false where id = ${id}::int`]);
+      LB.clear();
+      return J({ ok: true });
     }
 
     if (route === 'POST admin/delete-user') {
