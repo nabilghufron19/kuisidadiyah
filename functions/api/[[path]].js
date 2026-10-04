@@ -21,6 +21,83 @@ const PRICES = { ...SHOP, ...NSHOP };
 const DAILY_N = 10, DAILY_PASS = 80, RARE = 300, PITY = 10;
 const PRIZES = [[100, 49], [150, 24], [200, 12], [300, 8], [500, 4], [750, 2], [1000, 1]]; // hadiah minimal 100 gold
 const PASS_PCT = 60, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT = persen benar agar sebuah quest dianggap selesai
+
+// ---------- Pencapaian: katalog dan fungsi murni (diuji terpisah) ----------
+// <ach-pure>
+const STREAK_SKIP_DOW = 5; // hari yang tidak memutus streak (0 = Ahad ... 5 = Jumat, libur madrasah). Isi -1 untuk mematikan.
+const AG = { Umum: 25, Langka: 75, Epik: 150, Legendaris: 300, Mitos: 500 }; // Gold hadiah per tingkat, sekali per pencapaian
+const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Toko & Hoki', 'Profil & Komunitas'];
+const LEGEND_ITEMS = new Set(['lightning', 'comet', 'galaxy', 'n_blaze', 'n_frost', 'n_glitch', 'n_rainbow']); // item Legendaris + Mitos di Toko (harus sama dengan tier di index.html)
+// A(kunci, grup, nama, deskripsi, ikon, tingkat, metrik, target, { h: tersembunyi, ok: syarat tambahan })
+const A = (k, g, n, d, i, t, m, need, o = {}) => ({ k, g, n, d, i, t, gold: AG[t], m, need, h: o.h ? 1 : 0, ok: o.ok });
+const ACH = [
+  A('streak3', 0, 'Istiqomah 3 Hari', 'Aktif 3 hari berturut-turut', '🌱', 'Umum', 'streak', 3),
+  A('streak7', 0, 'Istiqomah 7 Hari', 'Aktif 7 hari berturut-turut', '🔥', 'Langka', 'streak', 7),
+  A('streak30', 0, 'Istiqomah 30 Hari', 'Aktif 30 hari berturut-turut', '🌟', 'Epik', 'streak', 30),
+  A('streak100', 0, 'Istiqomah 100 Hari', 'Aktif 100 hari berturut-turut', '👑', 'Mitos', 'streak', 100),
+  A('subuh1', 0, 'Pejuang Subuh', 'Selesaikan kuis (lulus) di waktu Subuh, pukul 03.45–05.30 WIB', '🌄', 'Langka', 'subuh', 1, { h: 1 }),
+  A('subuh7', 0, 'Ahli Subuh', 'Selesaikan 7 kuis (lulus) di waktu Subuh', '🌅', 'Epik', 'subuh', 7, { h: 1 }),
+  A('daily7', 0, 'Harian Tekun', 'Lulus kuis harian 7 hari berturut-turut', '📅', 'Epik', 'dstreak', 7),
+  A('daily30', 0, 'Harian Istiqomah', 'Lulus kuis harian 30 hari berturut-turut', '🗓️', 'Legendaris', 'dstreak', 30),
+  A('bangkit', 0, 'Bangkit Lagi', 'Naikkan nilai minimal 30 poin dari percobaan sebelumnya di level yang sama', '💪', 'Umum', 'improved', 1),
+  A('perfE', 1, 'Sempurna Mudah', 'Raih nilai 100 di level Mudah (jilid mana pun)', '🎯', 'Umum', 'perf_easy', 1),
+  A('perfM', 1, 'Sempurna Sedang', 'Raih nilai 100 di level Sedang (jilid mana pun)', '🏹', 'Langka', 'perf_medium', 1),
+  A('perfH', 1, 'Sempurna Sulit', 'Raih nilai 100 di level Sulit (jilid mana pun)', '💎', 'Epik', 'perf_hard', 1),
+  A('mj1', 1, 'Mumtaz Jilid 1', 'Raih nilai 100 di ketiga level Jilid 1', '💯', 'Epik', 'mj1', 1),
+  A('mj2', 1, 'Mumtaz Jilid 2', 'Raih nilai 100 di ketiga level Jilid 2', '💯', 'Epik', 'mj2', 1),
+  A('mj3', 1, 'Mumtaz Jilid 3', 'Raih nilai 100 di ketiga level Jilid 3', '💯', 'Epik', 'mj3', 1),
+  A('mj4', 1, 'Mumtaz Jilid 4', 'Raih nilai 100 di ketiga level Jilid 4', '💯', 'Epik', 'mj4', 1),
+  A('hafizh', 1, 'Hafizh Nahwu', 'Raih nilai 100 di semua 12 level', '🏆', 'Mitos', 'perfAll', 12),
+  A('run20', 1, 'Beruntun 20', 'Jawab benar 20 soal berturut-turut dalam satu sesi', '⚡', 'Langka', 'run', 20),
+  A('run50', 1, 'Beruntun 50', 'Jawab benar 50 soal berturut-turut dalam satu sesi', '🌩️', 'Epik', 'run', 50),
+  A('correct100', 1, 'Seratus Benar', 'Kumpulkan 100 jawaban benar', '📘', 'Umum', 'correct', 100),
+  A('correct500', 1, 'Lima Ratus Benar', 'Kumpulkan 500 jawaban benar', '📗', 'Langka', 'correct', 500),
+  A('correct1000', 1, 'Seribu Benar', 'Kumpulkan 1000 jawaban benar', '📚', 'Epik', 'correct', 1000),
+  A('clean', 2, 'Tanpa Cela', 'Capai soal ke-31 Tathbiq tanpa kehilangan nyawa', '🛡️', 'Legendaris', 'clean', 1),
+  A('marathon', 2, 'Maraton', 'Jawab 100 soal dalam satu sesi Tathbiq', '🏃', 'Epik', 'marathon', 100),
+  A('legend3', 3, 'Kolektor Legendaris', 'Miliki 3 item Legendaris atau Mitos di Toko', '💠', 'Legendaris', 'legend', 3),
+  A('legend5', 3, 'Kolektor Agung', 'Miliki 5 item Legendaris atau Mitos di Toko', '🔱', 'Mitos', 'legend', 5),
+  A('fxall', 3, 'Koleksi Efek Penuh', 'Miliki semua efek jawaban di Toko', '🎆', 'Mitos', 'fxOwned', Object.keys(SHOP).length),
+  A('nmall', 3, 'Koleksi Nama Penuh', 'Miliki semua gaya nama di Toko', '✒️', 'Mitos', 'nmOwned', Object.keys(NSHOP).length),
+  A('jackpot', 3, 'Jackpot', 'Dapatkan hadiah 1000 Gold dari spin kuis harian', '🎰', 'Mitos', 'jackpot', 1, { h: 1 }),
+  A('photo', 4, 'Wajah Baru', 'Unggah foto pribadi', '📷', 'Umum', 'photo', 1),
+  A('vet30', 4, 'Murid Lama', 'Akun berusia 30 hari dan aktif minimal 10 hari', '🕌', 'Langka', 'age', 30, { ok: m => m.active >= 10 }),
+  A('vet100', 4, 'Veteran', 'Akun berusia 100 hari dan aktif minimal 10 hari', '🏛️', 'Epik', 'age', 100, { ok: m => m.active >= 10 }),
+  A('eagle', 4, 'Mata Elang', 'Laporkan soal yang salah, lalu admin menerimanya (soal diperbaiki atau dihapus)', '🦅', 'Langka', 'accepted', 1),
+];
+const ACHBY = Object.fromEntries(ACH.map(a => [a.k, a]));
+const achMini = a => ({ k: a.k, n: a.n, i: a.i, t: a.t, g: a.gold });
+const badgeInfo = keys => (keys || []).map(k => ACHBY[k]).filter(Boolean).map(a => [a.i, a.n, a.t]); // [ikon, nama, tingkat] untuk lencana terpasang
+const dayNum = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5; // 'YYYY-MM-DD' -> nomor hari
+const dowOf = n => (n + 4) % 7; // nomor hari -> hari pekan (0 = Ahad); hari ke-0 (1 Jan 1970) = Kamis
+// nums: nomor hari aktif, urut naik dan unik. Mengembalikan streak terbaik dan streak berjalan (yang belum putus sampai hari ini).
+// Hari 'skip' tanpa aktivitas tidak memutus streak (dan tidak dihitung sebagai hari aktif).
+function streaks(nums, today, skip) {
+  const gapOk = (a, b) => { for (let x = a + 1; x < b; x++) if (dowOf(x) !== skip) return false; return true; };
+  let best = 0, run = 0, prev = null;
+  for (const x of nums) { run = prev !== null && gapOk(prev, x) ? run + 1 : 1; prev = x; if (run > best) best = run; }
+  return { best, cur: prev !== null && gapOk(prev, today) ? run : 0 };
+}
+// rekor jawaban benar berturut-turut menurut urutan soal; soal tak terjawab dihitung salah
+function maxRun(order, ans, keys) { let run = 0, best = 0; for (const id of order) { if (ans[id] && ans[id] === keys[id]) { if (++run > best) best = run; } else run = 0; } return best; }
+// raw: data mentah dari database -> metrik yang dibandingkan dengan target tiap pencapaian
+function calcMetrics(raw, today) {
+  const b = {}; for (const r of raw.best) b[r.jilid + ':' + r.level] = r.xp;
+  const J4 = [1, 2, 3, 4], LV = Object.keys(XPMAX), perf = (j, l) => (b[j + ':' + l] || 0) >= XPMAX[l];
+  const uniq = a => [...new Set(a.map(dayNum))].sort((x, y) => x - y);
+  const sk = streaks(uniq(raw.days), today, STREAK_SKIP_DOW), dk = streaks(uniq(raw.ddays), today, STREAK_SKIP_DOW), own = new Set(raw.items);
+  const m = {
+    streak: sk.best, streakCur: sk.cur, dstreak: dk.best, dstreakCur: dk.cur, subuh: raw.subuh, improved: raw.improved ? 1 : 0,
+    run: raw.bestRun, correct: raw.correct, clean: raw.clean ? 1 : 0, marathon: Math.max(0, raw.maxn - 1),
+    legend: [...LEGEND_ITEMS].filter(k => own.has(k)).length, fxOwned: Object.keys(SHOP).filter(k => own.has(k)).length, nmOwned: Object.keys(NSHOP).filter(k => own.has(k)).length,
+    jackpot: raw.jackpot ? 1 : 0, photo: raw.photo ? 1 : 0, age: raw.age || 0, active: new Set(raw.days).size, accepted: raw.accepted,
+    perfAll: J4.reduce((s, j) => s + LV.filter(l => perf(j, l)).length, 0),
+  };
+  for (const l of LV) m['perf_' + l] = J4.filter(j => perf(j, l)).length;
+  for (const j of J4) m['mj' + j] = LV.every(l => perf(j, l)) ? 1 : 0;
+  return m;
+}
+// </ach-pure>
 const keyCache = new Map(); // CryptoKey cukup dibuat sekali per isolate, bukan tiap request
 const hmacKey = s => keyCache.get(s) || (keyCache.set(s, crypto.subtle.importKey('raw', enc.encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])), keyCache.get(s));
 const LB = new Map(), LB_TTL = 10000; // cache leaderboard per isolate (hasilnya sama untuk semua pengguna)
@@ -81,6 +158,42 @@ export async function onRequest({ request, env, params, waitUntil }) {
     const b = {}; for (const r of rows) b[r.jilid + ':' + r.level] = r.xp;
     return [1, 2, 3, 4].map(j => Object.entries(XPMAX).every(([l, x]) => (b[j + ':' + l] || 0) >= x * PASS_PCT / 100));
   };
+
+  // ---------- Pencapaian: ambil data mentah (satu round trip), hitung metrik, buka yang baru ----------
+  const achRaw = async id => {
+    const [best, [a1], [im], days, ddays, [en], own, [mi], [st], [rp], have, [ub]] = await sql.transaction([
+      bestOf(id),
+      sql`select coalesce(sum(correct), 0)::int c, (count(*) filter (where jilid between 1 and 4 and score >= ${PASS_PCT} and (created_at at time zone 'Asia/Jakarta')::time between time '03:45' and time '05:30'))::int subuh from attempts where user_id = ${id}`,
+      sql`select exists(select 1 from (select score - lag(score) over (partition by jilid, level order by created_at) d from attempts where user_id = ${id} and jilid between 1 and 4) t where d >= 30) v`,
+      sql`select to_char(d, 'YYYY-MM-DD') d from (select (created_at at time zone 'Asia/Jakarta')::date d from attempts where user_id = ${id} and (jilid = 0 or score >= ${PASS_PCT}) union select day d from daily where user_id = ${id} and done) t order by d`,
+      sql`select to_char(day, 'YYYY-MM-DD') d from daily where user_id = ${id} and done and score >= ${DAILY_PASS} order by day`,
+      sql`select coalesce(max(n), 0)::int maxn, coalesce(bool_or(lives = 3 and n >= 31), false) clean from endless_runs where user_id = ${id}`,
+      sql`select item from purchases where user_id = ${id}`,
+      sql`select exists(select 1 from daily where user_id = ${id} and prize >= 1000) jp, (select photo_v is not null from users where id = ${id}) photo, (select floor(extract(epoch from now() - created_at) / 86400)::int from users where id = ${id}) age`,
+      sql`select coalesce(max(best_run), 0)::int r from user_stats where user_id = ${id}`,
+      sql`select count(*)::int n from question_reports where user_id = ${id} and accepted`,
+      sql`select key, unlocked_at, gold, seen from user_achievements where user_id = ${id}`,
+      sql`select badges from users where id = ${id}`]);
+    return { best, correct: a1.c, subuh: a1.subuh, improved: im.v, days: days.map(r => r.d), ddays: ddays.map(r => r.d), maxn: en.maxn, clean: en.clean,
+      items: own.map(r => r.item), jackpot: mi.jp, photo: mi.photo, age: mi.age, bestRun: st.r, accepted: rp.n, have, badges: ub ? ub.badges : [] };
+  };
+  // Buka semua pencapaian yang sudah memenuhi syarat (termasuk milik murid lama = backfill otomatis). Hadiah Gold dicatat di user_achievements.gold.
+  const evalFull = async (id, seen = true) => {
+    const raw = await achRaw(id), m = calcMetrics(raw, dayNum(wibDay())), have = new Set(raw.have.map(r => r.key));
+    const fresh = ACH.filter(a => !have.has(a.k) && m[a.m] >= a.need && (!a.ok || a.ok(m)));
+    let newly = [];
+    if (fresh.length) {
+      const ins = await sql`insert into user_achievements (user_id, key, gold, seen)
+        select ${id}::int, t.k, t.g, ${seen}::boolean from unnest(${fresh.map(a => a.k)}::text[], ${fresh.map(a => a.gold)}::int[]) as t(k, g)
+        on conflict do nothing returning key, gold`;
+      const got = new Set(ins.map(r => r.key));
+      newly = fresh.filter(a => got.has(a.k)).map(achMini);
+      for (const r of ins) raw.have.push({ key: r.key, unlocked_at: new Date().toISOString(), gold: r.gold, seen });
+    }
+    return { newly, m, have: raw.have, badges: raw.badges || [] };
+  };
+  // Dipakai di hook (kuis, Tathbiq, belanja, dll). Kegagalan di sini tidak boleh menggagalkan aksi utamanya.
+  const evalAch = (id, seen = true) => evalFull(id, seen).then(r => r.newly).catch(e => { console.error(e); return []; });
 
   // Pemilihan soal: soal ber-bab diprioritaskan dan diambil bergiliran per (jilid, bab) supaya semua bab tercakup;
   // kekurangannya diisi soal tanpa bab secara acak. Urutan akhir diacak. j = 0 berarti semua jilid; excl = id yang dilewati.
@@ -165,17 +278,19 @@ export async function onRequest({ request, env, params, waitUntil }) {
         }
       } catch (e) { got = 0; }
       // satu round trip untuk tiga query
-      const [[usr], best, [t], [sp], [bn], [rq]] = await sql.transaction([
-        sql`select username, role, avatar, fx, fxa, fxn, on_board, photo_v, use_photo from users where id = ${uid}`,
+      const [[usr], best, [t], [sp], [bn], [rq], [ag], un] = await sql.transaction([
+        sql`select username, role, avatar, fx, fxa, fxn, on_board, photo_v, use_photo, badges from users where id = ${uid}`,
         bestOf(uid),
         sql`select least(ceil(coalesce(max(n), 0) / 10.0), 7)::int as s from endless_runs where user_id = ${uid}`,
         sql`select coalesce(sum(price), 0)::int s from purchases where user_id = ${uid}`,
         sql`select gold_total_bonus(${uid}::int) s`,
-        sql`select case when (select role from users where id = ${uid}) = 'admin' then (select count(distinct question_id) from question_reports where status = 'open') else 0 end::int n`]);
+        sql`select case when (select role from users where id = ${uid}) = 'admin' then (select count(distinct question_id) from question_reports where status = 'open') else 0 end::int n`,
+        sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`,
+        sql`select key from user_achievements where user_id = ${uid} and not seen`]);
       if (!usr) return bad('Silakan masuk dulu', 401);
       const ach = jilidDone(best);
       const xpTot = best.reduce((a, r) => a + r.xp, 0), ri = Math.max(0, RANK_MIN.filter(m => m <= xpTot).length - 1);
-      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s, rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
+      return J({ rankGot: got, rankPay: usr.role === 'admin' ? 0 : RANK_PAY[ri], pays: RANK_PAY, starter: STARTER_GOLD, reports: rq.n, username: usr.username, role: usr.role, avatar: usr.avatar, photo: usr.photo_v, usePhoto: usr.use_photo, fxp: usr.fx, fxa: usr.fxa, fxn: usr.fxn, board: usr.on_board, spent: sp.s, bonus: bn.s + ag.s, bd: badgeInfo(usr.badges), unseen: un.map(r => ACHBY[r.key]).filter(Boolean).map(achMini), rate: GOLD_RATE, tstage: t.s, pass: PASS_PCT, ach, tathbiq: usr.role === 'admin' || ach.every(Boolean), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])) });
     }
 
     if (route === 'GET quiz') {
@@ -208,7 +323,12 @@ export async function onRequest({ request, env, params, waitUntil }) {
         throw e;
       }
       LB.clear();
-      return J({ correct: row.correct, total, score: row.score, xp: Math.round(XP[t.l] * row.correct / total) });
+      // rekor jawaban benar beruntun (urutan soal sesuai token); pencatatan ini tidak boleh menggagalkan hasil kuis
+      try {
+        const kq = await sql`select id, answer from questions where id = any(${t.ids}::int[])`, run = maxRun(t.ids, an, Object.fromEntries(kq.map(k => [k.id, k.answer])));
+        if (run > 0) await sql`insert into user_stats (user_id, best_run) values (${uid}::int, ${run}::int) on conflict (user_id) do update set best_run = greatest(user_stats.best_run, excluded.best_run)`;
+      } catch (e) { console.error(e); }
+      return J({ correct: row.correct, total, score: row.score, xp: Math.round(XP[t.l] * row.correct / total), ach: await evalAch(uid) });
     }
 
     if (route === 'POST endless/start') {
@@ -236,7 +356,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       // Klien mengirim urutan huruf jawaban sejak titik "from"; server memutar ulang nyawa, skor, dan tahap terhadap kunci di database.
       let ch = Array.isArray(body.choices) ? body.choices.slice(0, 300) : [];
       if (!ch.every(c => /^[ABCD]$/.test(c))) return bad('Jawaban tidak valid');
-      const [r] = await sql`select id, lives, score, correct, n, asked, done from endless_runs where id = ${+body.run || 0} and user_id = ${uid}`;
+      const [r] = await sql`select id, lives, score, correct, n, asked, done, cur_run from endless_runs where id = ${+body.run || 0} and user_id = ${uid}`;
       if (!r || r.done) return bad('Sesi endless sudah berakhir', 409);
       const off = r.n - 1 - (+body.from || 0); // kiriman ulang: buang jawaban yang sudah diproses
       if (off < 0 || off > ch.length) return bad('Jawaban tidak valid');
@@ -244,16 +364,16 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const ids = r.asked.slice(r.n - 1, r.n - 1 + ch.length);
       if (ids.length < ch.length) return bad('Jawaban tidak valid');
       const key = Object.fromEntries((await sql`select id, answer from questions where id = any(${ids}::int[])`).map(k => [k.id, k.answer]));
-      let { lives, score, correct, n } = r, over = false;
+      let { lives, score, correct, n } = r, over = false, run = r.cur_run || 0, bestRun = 0;
       for (let i = 0; i < ch.length; i++) {
         if (key[ids[i]]) { // soal yang dihapus admin dilewati
-          if (key[ids[i]] === ch[i]) { score += 10 * Math.ceil(n / 10); correct++; }
-          else if (--lives <= 0) { over = true; break; }
+          if (key[ids[i]] === ch[i]) { score += 10 * Math.ceil(n / 10); correct++; if (++run > bestRun) bestRun = run; }
+          else { run = 0; if (--lives <= 0) { over = true; break; } }
         }
         n++;
       }
       const done = over || body.end === true;
-      const qs = [sql`update endless_runs set lives = ${lives}, score = ${score}, correct = ${correct}, n = ${n}, done = ${done}, cur = null
+      const qs = [sql`update endless_runs set lives = ${lives}, score = ${score}, correct = ${correct}, n = ${n}, cur_run = ${run}, done = ${done}, cur = null
         where id = ${r.id} and n = ${r.n} and not done returning id`];
       if (n > 1) qs.push(sql`insert into attempts (user_id, jilid, level, total, correct, score, nonce)
         select user_id, 0, 'endless', case when lives <= 0 then n else n - 1 end, correct, score, 'endless-' || id
@@ -262,7 +382,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const [upd] = await sql.transaction(qs);
       if (!upd.length) return bad('Jawaban ini sudah dikirim', 409);
       LB.clear();
-      return J({ lives, score, correct, over: done });
+      if (bestRun > 0) { try { await sql`insert into user_stats (user_id, best_run) values (${uid}::int, ${bestRun}::int) on conflict (user_id) do update set best_run = greatest(user_stats.best_run, excluded.best_run)`; } catch (e) { console.error(e); } }
+      return J({ lives, score, correct, over: done, ach: await evalAch(uid) });
     }
 
     if (route === 'POST password') {
@@ -334,7 +455,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
         sql`update users set photo_v = extract(epoch from now())::int, use_photo = true where id = ${uid}::int returning photo_v`]);
       if (!r) return bad('Silakan masuk dulu', 401);
       LB.clear();
-      return J({ photo: r.photo_v, bytes: raw.length });
+      return J({ photo: r.photo_v, bytes: raw.length, ach: await evalAch(uid) });
     }
     if (route === 'POST photo/delete') {
       await sql.transaction([
@@ -342,6 +463,37 @@ export async function onRequest({ request, env, params, waitUntil }) {
         sql`update users set photo_v = null, use_photo = false where id = ${uid}::int`]);
       LB.clear();
       return J({ ok: true });
+    }
+
+    // ---------- Pencapaian dan lencana ----------
+    if (route === 'GET achievements') {
+      if (url.searchParams.get('lite')) { // ringan (halaman Profil): hanya yang sudah terbuka + lencana terpasang
+        const [own, [ub]] = await sql.transaction([sql`select key from user_achievements where user_id = ${uid}`, sql`select badges from users where id = ${uid}`]);
+        const has = new Set(own.map(r => r.key));
+        return J({ list: ACH.filter(a => has.has(a.k)).map(a => ({ k: a.k, n: a.n, d: a.d, i: a.i, t: a.t })), badges: (ub && ub.badges) || [] });
+      }
+      const ev = await evalFull(uid), have = new Map(ev.have.map(r => [r.key, r]));
+      const list = ACH.map(a => {
+        const h = have.get(a.k), got = !!h;
+        if (a.h && !got) return { k: a.k, g: a.g, n: '???', d: 'Pencapaian tersembunyi. Temukan sendiri!', i: '❔', t: a.t, gold: a.gold, h: 1, got: false, v: 0, need: 0 };
+        return { k: a.k, g: a.g, n: a.n, d: a.d, i: a.i, t: a.t, gold: a.gold, h: a.h, got, at: got ? h.unlocked_at : null, v: Math.min(ev.m[a.m] || 0, a.need), need: a.need };
+      });
+      return J({ list, groups: ACH_GROUPS, newly: ev.newly, pinned: ev.badges, skip: STREAK_SKIP_DOW,
+        earned: ev.have.reduce((s, r) => s + (r.gold || 0), 0),
+        cur: { streak: ev.m.streakCur, best: ev.m.streak, dstreak: ev.m.dstreakCur, dbest: ev.m.dstreak } });
+    }
+    if (route === 'POST achievements/seen') {
+      await sql`update user_achievements set seen = true where user_id = ${uid} and not seen`;
+      return J({ ok: true });
+    }
+    // Pasang sampai 3 lencana di profil; hanya dari pencapaian yang sudah terbuka. Urutan kiriman = urutan tampil.
+    if (route === 'POST badges') {
+      const want = [...new Set((Array.isArray(body.keys) ? body.keys : []).map(String))].filter(k => ACHBY[k]);
+      const own = want.length ? await sql`select key from user_achievements where user_id = ${uid} and key = any(${want}::text[])` : [];
+      const ok = new Set(own.map(r => r.key)), final = want.filter(k => ok.has(k)).slice(0, 3);
+      await sql`update users set badges = ${final}::text[] where id = ${uid}`;
+      LB.clear();
+      return J({ badges: final, bd: badgeInfo(final) });
     }
 
     // ---------- Laporan soal salah (murid -> admin) ----------
@@ -363,9 +515,9 @@ export async function onRequest({ request, env, params, waitUntil }) {
 
     // ---------- Toko ----------
     const shopState = async () => {
-      const [best, own, [u], [bn]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_total_bonus(${uid}::int) s`]);
+      const [best, own, [u], [bn], [ag]] = await sql.transaction([bestOf(uid), sql`select item, price from purchases where user_id = ${uid}`, sql`select fxa, fxn, role from users where id = ${uid}`, sql`select gold_total_bonus(${uid}::int) s`, sql`select coalesce(sum(gold), 0)::int s from user_achievements where user_id = ${uid}`]);
       const earned = best.reduce((a, r) => a + r.xp, 0) * GOLD_RATE, spent = own.reduce((a, r) => a + r.price, 0), admin = !!u && u.role === 'admin';
-      return { gold: earned + bn.s - spent, earned, bonus: bn.s, spent, admin, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: u ? u.fxa : null, equippedName: u ? u.fxn : null, prices: PRICES };
+      return { gold: earned + bn.s + ag.s - spent, earned, bonus: bn.s + ag.s, spent, admin, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: u ? u.fxa : null, equippedName: u ? u.fxn : null, prices: PRICES };
     };
     if (route === 'GET shop') return J(await shopState());
     if (route === 'POST shop/buy') {
@@ -376,13 +528,14 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const [, ins] = await sql.transaction([
         sql`select pg_advisory_xact_lock(${uid}::int)`,
         sql`with best as (select max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end) xp from attempts where user_id = ${uid} group by jilid, level),
-            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce(gold_total_bonus(${uid}::int), 0) - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
+            bal as (select coalesce((select sum(xp) from best), 0) * ${GOLD_RATE}::numeric + coalesce(gold_total_bonus(${uid}::int), 0) + coalesce((select sum(gold) from user_achievements where user_id = ${uid}), 0) - coalesce((select sum(price) from purchases where user_id = ${uid}), 0) g)
           insert into purchases (user_id, item, price) select ${uid}::int, ${item}::text, ${price}::int from bal where g >= ${price}::int on conflict do nothing returning item`]);
       if (!ins.length) {
         const [own] = await sql`select 1 from purchases where user_id = ${uid} and item = ${item}`;
         return own ? bad('Item ini sudah kamu miliki', 409) : bad('Gold belum cukup', 402);
       }
-      return J(await shopState());
+      const ach = await evalAch(uid);
+      return J({ ...(await shopState()), ach });
     }
     if (route === 'POST shop/equip') {
       const item = String(body.item || 'confetti');
@@ -431,7 +584,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
         update daily set done = true, correct = c.n, score = round(c.n * 100.0 / ${total}::int)::int from c
         where user_id = ${uid} and day = ${t.day}::date and not done returning correct, score`;
       if (!row) return bad('Kuis harian ini sudah diselesaikan', 409);
-      return J({ correct: row.correct, total, score: row.score, pass: row.score >= DAILY_PASS });
+      return J({ correct: row.correct, total, score: row.score, pass: row.score >= DAILY_PASS, ach: await evalAch(uid) });
     }
     if (route === 'POST daily/spin') {
       const [[row], [y]] = await sql.transaction([
@@ -443,7 +596,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       for (const [g, w] of pool) { if ((x -= w) < 0) { prize = g; break; } }
       const [u] = await sql`update daily set spun = true, prize = ${prize} where user_id = ${uid} and day = ${row.d}::date and done and score >= ${DAILY_PASS} and not spun returning prize`;
       if (!u) return bad('Spin sudah dipakai', 409);
-      return J({ prize, rare: prize >= RARE, pity: prize >= RARE ? 0 : y.n + 1 });
+      return J({ prize, rare: prize >= RARE, pity: prize >= RARE ? 0 : y.n + 1, ach: await evalAch(uid) });
     }
 
     if (route === 'GET leaderboard') {
@@ -458,9 +611,9 @@ export async function onRequest({ request, env, params, waitUntil }) {
           from attempts where case when ${j}::int = 0 then true when ${j}::int = 5 then level = 'endless' else jilid = ${j}::int end group by 1, 2, 3),
         ranked as (
           select rank() over (order by sum(xp) desc)::int as rank, u.id, u.username, u.avatar, u.role, u.fx as pick, u.fxn as nm,
-                 case when u.use_photo then u.photo_v end as ph,
+                 case when u.use_photo then u.photo_v end as ph, u.badges,
                  sum(xp)::int as total, (count(distinct jilid) filter (where jilid > 0))::int as jilids
-          from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx, u.fxn, u.photo_v, u.use_photo)
+          from best join users u on u.id = best.user_id where u.role <> 'admin' or u.on_board group by u.id, u.username, u.avatar, u.role, u.fx, u.fxn, u.photo_v, u.use_photo, u.badges)
         select * from ranked
         where ${q}::text = '' or strpos(lower(username), lower(${q}::text)) > 0
         order by rank, username limit 100`;
@@ -474,7 +627,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
         for (const r of bs) (by[r.user_id] ||= []).push(r);
         for (const r of ts) st[r.user_id] = r.s;
       }
-      for (const r of rows) { const mx = r.role === 'admin' ? 11 : jilidDone(by[r.id] || []).filter(Boolean).length + (st[r.id] || 0); r.fx = r.pick == null ? mx : Math.min(r.pick, mx); delete r.id; delete r.role; delete r.pick; }
+      for (const r of rows) { const mx = r.role === 'admin' ? 11 : jilidDone(by[r.id] || []).filter(Boolean).length + (st[r.id] || 0); r.fx = r.pick == null ? mx : Math.min(r.pick, mx); delete r.id; delete r.role; delete r.pick; r.bd = badgeInfo(r.badges); delete r.badges; }
       const out = { rows };
       if (LB.size > 60) LB.clear();
       LB.set(ck, { t: Date.now() + LB_TTL, v: out });
@@ -485,7 +638,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
     // Hanya data publik: XP, pencapaian, efek foto, dan koleksi item. Gold, riwayat percobaan, dan data akun TIDAK dikirim.
     if (route === 'GET player') {
       const un = (url.searchParams.get('u') || '').trim().slice(0, 30);
-      const [t] = un ? await sql`select id, username, role, avatar, fx, fxa, fxn, on_board, created_at, photo_v, use_photo from users where lower(username) = lower(${un})` : [];
+      const [t] = un ? await sql`select id, username, role, avatar, fx, fxa, fxn, on_board, created_at, photo_v, use_photo, badges from users where lower(username) = lower(${un})` : [];
       if (!t || (t.role === 'admin' && !t.on_board)) return bad('Pemain tidak ditemukan', 404);
       const [best, [en], own] = await sql.transaction([
         bestOf(t.id),
@@ -494,7 +647,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const admin = t.role === 'admin', ach = admin ? [true, true, true, true] : jilidDone(best);
       const mx = admin ? 11 : ach.filter(Boolean).length + en.s;
       return J({
-        username: t.username, admin, avatar: t.avatar, ph: t.use_photo ? t.photo_v : null, since: t.created_at,
+        username: t.username, admin, avatar: t.avatar, ph: t.use_photo ? t.photo_v : null, bd: badgeInfo(t.badges), since: t.created_at,
         fx: t.fx == null ? mx : Math.min(t.fx, mx),
         total: best.reduce((a, r) => a + r.xp, 0), best: Object.fromEntries(best.map(r => [r.jilid + ':' + r.level, r.xp])),
         ach, tstage: admin ? 7 : en.s, owned: admin ? Object.keys(PRICES) : own.map(r => r.item), equipped: t.fxa, nm: t.fxn
@@ -599,7 +752,10 @@ export async function onRequest({ request, env, params, waitUntil }) {
     if (route === 'POST admin/report-resolve') {
       const id = +body.question;
       if (!Number.isInteger(id) || id < 1) return bad('Soal tidak valid');
-      const r = await sql`update question_reports set status = 'done' where question_id = ${id} and status = 'open' returning id`;
+      // accepted = laporan benar (soal diedit atau dihapus admin): pelapor mendapat kredit untuk pencapaian Mata Elang, diberi tahu saat membuka aplikasi
+      const acc = body.accepted === true;
+      const r = await sql`update question_reports set status = 'done', accepted = ${acc} where question_id = ${id} and status = 'open' returning user_id`;
+      if (acc) for (const rid of new Set(r.map(x => x.user_id))) await evalAch(rid, false);
       return J({ resolved: r.length });
     }
 
