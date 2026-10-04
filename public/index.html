@@ -50,10 +50,19 @@ h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1;letter-spacing:-.03em;marg
 .lrow{display:grid;grid-template-columns:44px 1fr auto auto;gap:12px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}.lrow:last-child{border:0}
 .lrow.me{background:var(--soft);border-radius:12px}.rk{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--bg);font-weight:800}
 .r1{background:#F5C518;color:#3a2e00}.r2{background:#C9D1D9;color:#222}.r3{background:#D08B4F;color:#2b1500}
-.scrim{display:none}
-@media(max-width:820px){.top{display:flex}.side{position:fixed;z-index:30;inset:0 auto 0 0;width:min(300px,86vw);transform:translateX(-100%);transition:transform .25s}
-.app.open .side{transform:none}.app.open .scrim{display:block;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45)}.grid{grid-template-columns:1fr}}
-.anon .side,.anon .top{display:none}
+.bnav{display:none}
+@media(max-width:820px){.top{display:flex;justify-content:center;padding:8px 16px}.side{display:none}.grid{grid-template-columns:1fr}
+.scroll{padding:14px 14px calc(78px + env(safe-area-inset-bottom))}
+.bnav{display:flex;position:fixed;z-index:30;left:0;right:0;bottom:0;background:var(--side);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.bn{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;font-size:.68rem;font-weight:700;color:var(--muted)}
+.bn span{font-size:1.25rem;line-height:1}.bn.active{color:var(--ink);background:var(--surface);box-shadow:0 1px 0 var(--line)}
+.bn.dot::after{content:'';position:absolute;top:4px;right:calc(50% - 20px);width:9px;height:9px;border-radius:50%;background:#ef4444;border:2px solid var(--side)}}
+.anon .side,.anon .top,.anon .bnav{display:none}
+.ptabs{position:sticky;top:-14px;z-index:5;background:var(--bg);padding:8px 0;margin:0 0 6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.ptabs::-webkit-scrollbar{display:none}.ptabs button{flex:none;padding:8px 12px;white-space:nowrap;font-size:.9rem}@media(max-width:560px){.ptabs{gap:4px}.ptabs button{padding:8px 9px;font-size:.82rem}}
+.fold{padding:0}.fold>summary{display:flex;flex-direction:column;gap:2px;padding:16px 20px;cursor:pointer;list-style:none}.fold>summary::-webkit-details-marker{display:none}.fold>summary h2{margin:0}.fold>summary .muted{margin:0;font-size:.85rem}.fold>summary::after{content:'▾';position:absolute;right:20px;top:16px;color:var(--muted)}.fold{position:relative}.fold[open]>summary::after{content:'▴'}.fold>.avs{padding:0 20px 20px}
+.slist{display:flex;flex-direction:column;gap:8px}.srow{display:grid;grid-template-columns:34px 1fr;column-gap:10px;align-items:center;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg)}.srow span{grid-row:span 2;font-size:1.4rem;text-align:center}.srow small{color:var(--muted)}.srow:hover{border-color:var(--accent)}.srow.out b{color:#c0392b}
+.chips{display:flex;gap:8px;flex-wrap:wrap}.pchip{padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);font-weight:700;font-size:.9rem;opacity:.6}.pchip.on{opacity:1;border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,var(--bg))}
+.agrp{margin-bottom:12px}.agrp>summary{display:flex;justify-content:space-between;align-items:center;cursor:pointer;list-style:none;padding:10px 4px}.agrp>summary::-webkit-details-marker{display:none}.agrp>summary h2{margin:0}.agrp>summary span{color:var(--muted);font-weight:700}.agrp>summary::after{content:'▾';margin-left:10px;color:var(--muted)}.agrp[open]>summary::after{content:'▴'}
 
 /* ===== Animasi & level ===== */
 @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
@@ -350,6 +359,9 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .bp.on{border-color:var(--tc);box-shadow:inset 0 0 0 2px var(--tc);background:color-mix(in srgb,var(--tc) 12%,var(--bg))}
 .bp.on::after{content:'📌';position:absolute;top:-8px;right:4px;font-size:.9rem}
 
+/* ===== Perapian tampilan (mobile): grid efek padat, daftar lencana bisa digulir ===== */
+.bpk{max-height:300px;overflow-y:auto;padding:4px}
+@media(max-width:560px){.fxg{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.fxi{padding:16px 4px 10px;font-size:.82rem}.fxi b{font-size:.82rem}.bpk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
@@ -362,16 +374,15 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
     <button class="nav" data-v="admin" id="navAdmin" hidden>Panel Admin</button>
     <div class="sp"></div>
     <button class="nav" data-v="profile" id="who"></button>
-    <button class="nav" id="guideBtn">Panduan</button>
-    <button class="nav" id="theme">Ganti tema</button>
-    <button class="nav" id="out">Keluar</button>
     <div class="credit">Powered by<br><b>Nabil Ghufron</b> 1447-1448 H</div>
   </aside>
-  <div class="scrim" id="scrim"></div>
-  <main class="main">
-    <header class="top"><button class="icon-btn" id="menu" aria-label="Menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button><img class="top-logo" src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></header>
+    <main class="main">
+    <header class="top"><img class="top-logo" src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></header>
     <div class="scroll"><div class="wrap" id="view"></div><div class="credit">Powered by <b>Nabil Ghufron</b> 1447-1448 H</div></div>
   </main>
+  <nav class="bnav" aria-label="Menu utama">
+    <button class="bn" data-v="home"><span>🏠</span>Beranda</button><button class="bn" data-v="daily"><span>🎯</span>Harian</button><button class="bn" data-v="board"><span>🏆</span>Peringkat</button><button class="bn" data-v="shop"><span>🛒</span>Toko</button><button class="bn" data-v="ach"><span>🏅</span>Capaian</button><button class="bn" data-v="profile"><span>👤</span>Profil</button>
+  </nav>
 </div>
 <script>
 const $ = s => document.querySelector(s), V = $('#view');
@@ -408,6 +419,7 @@ function openReport(qid) {
 const setRep = n => {
   if (me) me.reports = Math.max(0, n);
   const nv = $('#navAdmin'); if (nv && me && me.role === 'admin') nv.textContent = 'Panel Admin' + (me.reports ? ' 🚩' + me.reports : '');
+  const pb = document.querySelector('.bn[data-v="profile"]'); if (pb) pb.classList.toggle('dot', !!(me && me.role === 'admin' && me.reports));
   const tb = document.querySelector('[data-t="lap"]'); if (tb && me) tb.textContent = '🚩 Laporan' + (me.reports ? ' (' + me.reports + ')' : '');
 };
 async function api(p, b) {
@@ -425,7 +437,7 @@ async function api(p, b) {
 const closeMenu = () => $('#app').classList.remove('open');
 function go(v, a) {
   closeMenu(); if (me) renderChip();
-  document.querySelectorAll('.nav[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  document.querySelectorAll('.nav[data-v], .bn[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   ({ auth: vAuth, home: vHome, board: vBoard, daily: vDaily, shop: vShop, ach: vAch, admin: vAdmin, profile: vProfile })[v](a);
   $('.scroll').scrollTop = 0;
 }
@@ -1314,6 +1326,7 @@ async function compressPhoto(file) {
   const b64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(best.b); });
   return { b64, size: best.size, bytes: best.b.size };
 }
+let ptab = 'look';
 async function vProfile() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   try { Object.assign(me, await api('me')); } catch (e) { V.textContent = e.message; return; }
@@ -1322,21 +1335,28 @@ async function vProfile() {
   const dk = () => usePh && ph ? pkey(me.username, ph) : cur; // kunci avatar yang sedang dipilih (foto atau emoji)
   V.innerHTML = `<div class="card prof"><div id="pav">${av(dk(), 'lg', fxOf(pk))}</div><div><h1>${nm(me.username, me.fxn)}</h1><div id="mybdg">${bdgChips(me.bd)}</div><span class="tag" style="background:${RANKS[ri][3]};color:${RANKS[ri][2]}">${RI(ri, 20)}${RANKS[ri][1]}</span>
     <p class="muted">${xp} XP · Rekor Tathbiq ${me.best['0:endless'] || 0} XP</p></div></div>
-    <div class="card"><h2>Foto pribadi</h2><div class="phrow"><div id="phprev"></div><div><p class="muted" id="phinfo" style="margin:0 0 10px"></p>
+    <div class="tabs ptabs" id="ptabs">${[['look', '🎨 Tampilan'], ['acc', '👤 Akun'], ['set', '⚙️ Setelan'], ['win', '🏅 Prestasi']].map(([k, t]) => `<button data-pt="${k}" class="${ptab === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <section class="pnl" data-p="look"${ptab === 'look' ? '' : ' hidden'}><div class="card"><h2>Foto pribadi</h2><div class="phrow"><div id="phprev"></div><div><p class="muted" id="phinfo" style="margin:0 0 10px"></p>
       <div class="acts"><button class="btn" id="phpick">Pilih foto</button><button class="btn ghost" id="phuse" hidden>Pakai foto ini</button><button class="btn ghost del" id="phdel" hidden>Hapus foto</button></div></div></div>
       <input type="file" id="phf" accept="image/*" hidden><div class="err" id="pherr" style="margin-top:8px"></div>
       <p class="muted" style="margin:0;font-size:.85rem">Foto dipotong persegi dan dikecilkan otomatis di perangkatmu (hanya ±4–9 KB yang diunggah, foto aslinya tidak disimpan). Foto tampil publik di leaderboard, jadi pakai foto yang sopan. Admin bisa menghapus foto yang tidak pantas.</p></div>
-    <div class="card"><h2>Ubah profil</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off"><p class="muted">Atau pilih foto emoji:</p>
-    <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div>
-    ${ADM() ? `<label class="chk"><input type="checkbox" id="pbd"${me.board === false ? '' : ' checked'}> Tampilkan akunku di leaderboard</label>` : ''}<div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
-    <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div>
-    <div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di Toko atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
+    <details class="card fold"${ph ? '' : ' open'}><summary><h2>Foto emoji</h2><span class="muted">Pilih salah satu jika tidak memakai foto pribadi</span></summary>
+      <div class="avs">${AVS.map((a, i) => `<button class="avb${'a' + (i + 1) === cur ? ' on' : ''}" data-a="a${i + 1}" aria-label="Foto ${i + 1}">${av('a' + (i + 1))}</button>`).join('')}</div></details>
+    <div class="card"><h2>Lencana profil</h2><div id="bpk" class="muted">Memuat…</div></div>
+    <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(dk(), pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan tampilan</button></div></div></section>
+    <section class="pnl" data-p="acc"${ptab === 'acc' ? '' : ' hidden'}><div class="card"><h2>Nama pengguna</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off">${ADM() ? `<label class="chk"><input type="checkbox" id="pbd"${me.board === false ? '' : ' checked'}> Tampilkan akunku di leaderboard</label>` : ''}<div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
+    <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div></section>
+    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di Toko atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
     <div class="tabs" id="fxq">${[['auto', 'Otomatis'], ['high', 'Tinggi'], ['mid', 'Sedang'], ['low', 'Rendah']].map(([k, t]) => `<button data-fq="${k}" class="${FXQ.mode === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <p class="muted" id="fxqn"></p><button class="btn ghost" id="fxt">Coba efek</button></div>
-    <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(dk(), pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan efek</button></div></div>
-    <div class="card"><h2>Lencana profil</h2><div id="bpk" class="muted">Memuat…</div></div>
-    <div class="card"><h2>Pencapaian jilid dan Tathbiq (${myFx()}/11)</h2><p class="muted">Khatam jilid: selesaikan semua quest (Mudah, Sedang, Sulit).</p><div class="ach">${[1, 2, 3, 4].map(j => `<div class="ac${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}"><span>${AJD(j) ? '🏅' : '🔒'}</span><b>Jilid ${j}</b><small>${AJD(j) ? (ADM() ? 'Terbuka (admin)' : 'Semua quest selesai') : JN(j) + '/3 quest'}</small></div>`).join('')}</div><p class="muted" style="margin-top:14px">Mode Tathbiq${TAT() ? '' : ' (terkunci sampai keempat jilid selesai)'}:</p><div class="ach">${STG.map((s, i) => `<div class="ac${i < TS() ? ' on' : ''}" style="--c:${s[1]}"><span>${i < TS() ? s[2] : '🔒'}</span><b>${s[0]}</b><small>Capai soal ke-${i * 10 + 1}</small></div>`).join('')}</div></div>
-    <div class="card"><h2>Pencapaian rank (${ADM() ? RANKS.length : ri + 1}/${RANKS.length})</h2><p class="muted">Naik rank dengan mengumpulkan total XP.</p><div class="ach">${RANKS.map((r, n) => { const on = ADM() || n <= ri; return `<div class="ac${on ? ' on' : ''}" style="--c:${r[3]}"><span>${RI(n, 44)}</span><b>${r[1]}</b><small>${on ? (ADM() ? 'Terbuka (admin)' : 'Tercapai') : r[0] + ' XP'}</small></div>`; }).join('')}</div></div>`;
+    <div class="card"><h2>Bantuan dan akun</h2><div class="slist"><button class="srow" id="pGuide"><span>📖</span><b>Panduan</b><small>Cara memakai Al-Miftah</small></button><button class="srow" id="pTheme"><span>🌓</span><b>Ganti tema</b><small>Terang atau gelap</small></button>${ADM() ? `<button class="srow adminlnk" data-v="admin"><span>🛠️</span><b>Panel Admin</b><small>${me.reports ? me.reports + ' laporan soal menunggu' : 'Kelola soal dan murid'}</small></button>` : ''}<button class="srow out" id="pOut"><span>🚪</span><b>Keluar</b><small>Akhiri sesi di perangkat ini</small></button></div></div></section>
+    <section class="pnl" data-p="win"${ptab === 'win' ? '' : ' hidden'}><div class="card"><h2>Rank</h2><div class="phrow"><span>${RI(ri, 56)}</span><div style="flex:1;min-width:160px"><b style="font-size:1.1rem">${RANKS[ri][1]}</b><div class="muted" style="margin:2px 0 8px">${xp} XP${RANKS[ri + 1] ? ' · ' + (RANKS[ri + 1][0] - xp) + ' XP lagi menuju ' + RANKS[ri + 1][1] : ' · tingkat tertinggi'}</div><div class="bar" style="margin:0"><i style="width:${RANKS[ri + 1] ? Math.round((xp - RANKS[ri][0]) / (RANKS[ri + 1][0] - RANKS[ri][0]) * 100) : 100}%;background:${RANKS[ri][3]}"></i></div></div></div></div><div class="card"><h2>Jilid dan Tathbiq (${myFx()}/11)</h2><div class="chips">${[1, 2, 3, 4].map(j => `<span class="pchip${AJD(j) ? ' on' : ''}" style="--c:${JC[j][0]}">${AJD(j) ? '🏅' : '🔒'} Jilid ${j}${AJD(j) ? '' : ' · ' + JN(j) + '/3'}</span>`).join('')}</div><p class="muted" style="margin:12px 0 0">${TAT() ? 'Mode Tathbiq: tahap ' + TS() + ' dari ' + STG.length + (TS() ? ' (' + STG[TS() - 1][0] + ')' : '') + '.' : 'Mode Tathbiq terbuka setelah keempat jilid selesai.'}</p></div><div class="card"><h2>Pencapaian</h2><p class="muted" id="pcnt">Memuat…</p><button class="btn" id="pgoAch">Lihat semua pencapaian →</button></div></section>`;
+  V.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { ptab = b.dataset.pt; V.querySelectorAll('[data-pt]').forEach(x => x.classList.toggle('on', x === b)); V.querySelectorAll('.pnl').forEach(x => { x.hidden = x.dataset.p !== ptab; }); });
+  $('#pGuide').onclick = () => openGuide();
+  $('#pTheme').onclick = () => theme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  $('#pOut').onclick = () => { tok = null; try { localStorage.removeItem('tk'); } catch (e) {} boot(); };
+  $('#pgoAch').onclick = () => go('ach');
+  V.querySelectorAll('.adminlnk').forEach(b => b.onclick = () => go('admin'));
   const phUI = () => {
     $('#phprev').innerHTML = av(dk(), 'lg');
     $('#phinfo').textContent = ph ? (usePh ? '✅ Foto pribadi sedang dipakai.' : 'Foto tersimpan tapi belum dipakai (kamu memilih foto emoji).') : 'Belum ada foto pribadi.';
@@ -1399,16 +1419,17 @@ async function vProfile() {
       catch (e) { toast(e.message, '⚠️'); }
     });
   };
-  api('achievements?lite=1').then(d => { bl = d.list; pin = d.badges; drawBadges(); }).catch(() => { const box = $('#bpk'); if (box) box.textContent = 'Gagal memuat lencana.'; });
+  api('achievements?lite=1').then(d => { bl = d.list; pin = d.badges; drawBadges(); const pc = $('#pcnt'); if (pc) pc.textContent = d.list.length + ' pencapaian sudah terbuka. Buka halaman Pencapaian untuk melihat target berikutnya.'; }).catch(() => { const box = $('#bpk'); if (box) box.textContent = 'Gagal memuat lencana.'; });
   refresh();
 }
 
 /* ---------- Pencapaian ---------- */
-let achTab = 'all';
+let achTab = 'all', achOpen = null;
 async function vAch() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let d; try { d = await api('achievements'); } catch (e) { V.textContent = e.message; return; }
   noteAch(d.newly);
+  if (!achOpen) { const fi = d.groups.findIndex((g, gi) => d.list.some(a => a.g === gi && !a.got)); achOpen = new Set([fi < 0 ? 0 : fi]); }
   const DN = ['Ahad', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'], got = d.list.filter(a => a.got).length;
   const card = a => {
     const pc = a.need ? Math.round(a.v / a.need * 100) : 0;
@@ -1420,7 +1441,7 @@ async function vAch() {
     const show = d.list.filter(a => achTab === 'all' || (achTab === 'got') === a.got);
     const body = d.groups.map((g, gi) => {
       const items = show.filter(a => a.g === gi);
-      return items.length ? `<div class="sec"><h2>${g}</h2><span>${d.list.filter(a => a.g === gi && a.got).length}/${d.list.filter(a => a.g === gi).length}</span></div><div class="achg">${items.map(card).join('')}</div>` : '';
+      return items.length ? `<details class="agrp" data-g="${gi}"${achTab !== 'all' || achOpen.has(gi) ? ' open' : ''}><summary><h2>${g}</h2><span>${d.list.filter(a => a.g === gi && a.got).length}/${d.list.filter(a => a.g === gi).length}</span></summary><div class="achg">${items.map(card).join('')}</div></details>` : '';
     }).join('');
     V.innerHTML = `<h1>Pencapaian</h1>
       <div class="card"><div class="phrow" style="justify-content:space-between"><div><h2 style="margin:0">${got} / ${d.list.length} terbuka</h2><p class="muted" style="margin:4px 0 0">${GL} ${d.earned} Gold didapat dari pencapaian</p></div>
@@ -1430,6 +1451,7 @@ async function vAch() {
       <div class="tabs">${[['all', 'Semua'], ['got', 'Terbuka'], ['lock', 'Terkunci']].map(([k, t]) => `<button data-at="${k}" class="${achTab === k ? 'on' : ''}">${t}</button>`).join('')}</div>` +
       (body || '<p class="muted">Tidak ada pencapaian di tab ini.</p>');
     V.querySelectorAll('[data-at]').forEach(b => b.onclick = () => { achTab = b.dataset.at; draw(); });
+    V.querySelectorAll('.agrp').forEach(x => x.ontoggle = () => { if (achTab === 'all') { if (x.open) achOpen.add(+x.dataset.g); else achOpen.delete(+x.dataset.g); } });
     setTimeout(() => { const g = $('#apg'); if (g) g.style.width = got / d.list.length * 100 + '%'; }, 80);
   };
   draw();
@@ -1745,12 +1767,8 @@ async function boot() {
   if (me) { renderChip(); warmFx(); $('#navAdmin').hidden = me.role !== 'admin'; setRep(me.reports || 0); go('home'); if (me.unseen && me.unseen.length) { noteAch(me.unseen, true); api('achievements/seen', {}).catch(() => {}); } if (me.role === 'admin' && me.reports) setTimeout(() => toast('Ada <b>' + me.reports + ' soal</b> dilaporkan murid. Buka Panel Admin → Laporan.', '🚩'), 800); let g = false; try { if (!localStorage.getItem('guide1')) { localStorage.setItem('guide1', '1'); g = true; } } catch (e) {}
     if (justReg) { justReg = false; openWelcome(g); } else if (g) openGuide(); } else go('auth');
 }
-document.querySelectorAll('.nav[data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
-$('#guideBtn').onclick = () => { closeMenu(); openGuide(); };
-$('#out').onclick = () => { tok = null; try { localStorage.removeItem('tk'); } catch (e) {} boot(); };
-$('#menu').onclick = () => $('#app').classList.add('open'); $('#scrim').onclick = closeMenu;
+document.querySelectorAll('.nav[data-v], .bn[data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
 function theme(t) { document.documentElement.setAttribute('data-theme', t); try { localStorage.setItem('theme', t); } catch (e) {} }
-$('#theme').onclick = () => theme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 try { const t = localStorage.getItem('theme'); if (t) theme(t); } catch (e) {}
 boot();
 </script>
