@@ -18,18 +18,21 @@ const SHOP = { stars: 100, bubbles: 200, petals: 300, coins: 450, fireworks: 600
 const NSHOP = { n_mint: 100, n_ocean: 150, n_grape: 300, n_sunset: 400, n_shimmer: 600, n_neon: 800, n_blaze: 1100, n_frost: 1300, n_glitch: 2000, n_rainbow: 2500 };
 const PRICES = { ...SHOP, ...NSHOP };
 // Kuis harian: 10 soal acak semua jilid; nilai >= DAILY_PASS memberi 1 spin. Hadiah = [gold, bobot]. Spin ke-PITY sejak hadiah >= RARE terakhir dijamin langka.
-const DAILY_N = 10, DAILY_PASS = 80, RARE = 300, PITY = 10;
-const PRIZES = [[100, 49], [150, 24], [200, 12], [300, 8], [500, 4], [750, 2], [1000, 1]]; // hadiah minimal 100 gold
+const DAILY_N = 10, DAILY_PASS = 80, RARE = 500, PITY = 10;
+const PRIZES = [[150, 30], [200, 25], [300, 20], [500, 13], [750, 7], [1000, 5]]; // hadiah minimal 150 gold; rata-rata sekitar 322 gold per spin
+// Cepat Tepat (kuis harian kedua): 10 soal, batas waktu per soal turun dari 10 detik ke 5 detik. Jeda antarsoal di klien +-1,2 detik.
+const FAST_LIM = [10, 9, 9, 8, 8, 7, 7, 6, 6, 5], FAST_PASS = 80, FAST_GRACE_MS = 800, FAST_SLACK_MS = 35000; // FAST_SLACK_MS = kelonggaran total (jeda, jaringan)
+const RANK_MIN_XP = 300, RANK_MIN_PLAYERS = 5; // syarat pencapaian peringkat leaderboard
 const PASS_PCT = 60, XPMAX = { easy: 100, medium: 200, hard: 300 }; // PASS_PCT = persen benar agar sebuah quest dianggap selesai
 
 // ---------- Pencapaian: katalog dan fungsi murni (diuji terpisah) ----------
 // <ach-pure>
 const STREAK_SKIP_DOW = 5; // hari yang tidak memutus streak (0 = Ahad ... 5 = Jumat, libur madrasah). Isi -1 untuk mematikan.
 const AG = { Umum: 25, Langka: 75, Epik: 150, Legendaris: 300, Mitos: 500 }; // Gold hadiah per tingkat, sekali per pencapaian
-const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Toko & Hoki', 'Profil & Komunitas'];
+const ACH_GROUPS = ['Konsistensi', 'Ketepatan', 'Tathbiq', 'Toko & Hoki', 'Profil & Komunitas', 'Peringkat'];
 const LEGEND_ITEMS = new Set(['lightning', 'comet', 'galaxy', 'n_blaze', 'n_frost', 'n_glitch', 'n_rainbow']); // item Legendaris + Mitos di Toko (harus sama dengan tier di index.html)
 // A(kunci, grup, nama, deskripsi, ikon, tingkat, metrik, target, { h: tersembunyi, ok: syarat tambahan })
-const A = (k, g, n, d, i, t, m, need, o = {}) => ({ k, g, n, d, i, t, gold: AG[t], m, need, h: o.h ? 1 : 0, ok: o.ok });
+const A = (k, g, n, d, i, t, m, need, o = {}) => ({ k, g, n, d, i, t, gold: AG[t], m, need, h: o.h ? 1 : 0, np: o.np ? 1 : 0, ok: o.ok });
 const ACH = [
   A('streak3', 0, 'Istiqomah 3 Hari', 'Aktif 3 hari berturut-turut', '🌱', 'Umum', 'streak', 3),
   A('streak7', 0, 'Istiqomah 7 Hari', 'Aktif 7 hari berturut-turut', '🔥', 'Langka', 'streak', 7),
@@ -48,6 +51,7 @@ const ACH = [
   A('mj3', 1, 'Mumtaz Jilid 3', 'Raih nilai 100 di ketiga level Jilid 3', '💯', 'Epik', 'mj3', 1),
   A('mj4', 1, 'Mumtaz Jilid 4', 'Raih nilai 100 di ketiga level Jilid 4', '💯', 'Epik', 'mj4', 1),
   A('hafizh', 1, 'Hafizh Nahwu', 'Raih nilai 100 di semua 12 level', '🏆', 'Mitos', 'perfAll', 12),
+  A('kilat', 1, 'Kilat Sempurna', 'Raih nilai 100 di kuis harian Cepat Tepat', '⏱️', 'Epik', 'fastPerf', 1),
   A('run20', 1, 'Beruntun 20', 'Jawab benar 20 soal berturut-turut dalam satu sesi', '⚡', 'Langka', 'run', 20),
   A('run50', 1, 'Beruntun 50', 'Jawab benar 50 soal berturut-turut dalam satu sesi', '🌩️', 'Epik', 'run', 50),
   A('correct100', 1, 'Seratus Benar', 'Kumpulkan 100 jawaban benar', '📘', 'Umum', 'correct', 100),
@@ -63,6 +67,9 @@ const ACH = [
   A('photo', 4, 'Wajah Baru', 'Unggah foto pribadi', '📷', 'Umum', 'photo', 1),
   A('vet30', 4, 'Murid Lama', 'Akun berusia 30 hari dan aktif minimal 10 hari', '🕌', 'Langka', 'age', 30, { ok: m => m.active >= 10 }),
   A('vet100', 4, 'Veteran', 'Akun berusia 100 hari dan aktif minimal 10 hari', '🏛️', 'Epik', 'age', 100, { ok: m => m.active >= 10 }),
+  A('rank3', 5, 'Tiga Besar', 'Capai peringkat 3 besar di Leaderboard (Semua), minimal ' + RANK_MIN_XP + ' XP dan ' + RANK_MIN_PLAYERS + ' murid terdaftar', '🥉', 'Epik', 'rankScore', 1, { np: 1 }),
+  A('rank2', 5, 'Peringkat Dua', 'Capai peringkat 2 di Leaderboard (Semua)', '🥈', 'Legendaris', 'rankScore', 2, { np: 1 }),
+  A('rank1', 5, 'Juara Umum', 'Capai peringkat 1 di Leaderboard (Semua)', '🥇', 'Mitos', 'rankScore', 3, { np: 1 }),
   A('eagle', 4, 'Mata Elang', 'Laporkan soal yang salah, lalu admin menerimanya (soal diperbaiki atau dihapus)', '🦅', 'Langka', 'accepted', 1),
 ];
 const ACHBY = Object.fromEntries(ACH.map(a => [a.k, a]));
@@ -90,6 +97,8 @@ function calcMetrics(raw, today) {
     streak: sk.best, streakCur: sk.cur, dstreak: dk.best, dstreakCur: dk.cur, subuh: raw.subuh, improved: raw.improved ? 1 : 0,
     run: raw.bestRun, correct: raw.correct, clean: raw.clean ? 1 : 0, marathon: Math.max(0, raw.maxn - 1),
     legend: [...LEGEND_ITEMS].filter(k => own.has(k)).length, fxOwned: Object.keys(SHOP).filter(k => own.has(k)).length, nmOwned: Object.keys(NSHOP).filter(k => own.has(k)).length,
+    fastPerf: raw.fastPerf ? 1 : 0, rankPos: raw.rank ? raw.rank.pos : 0, players: raw.rank ? raw.rank.players : 0,
+    rankScore: raw.rank && raw.rank.players >= RANK_MIN_PLAYERS && raw.rank.xp >= RANK_MIN_XP && raw.rank.pos <= 3 ? 4 - raw.rank.pos : 0,
     jackpot: raw.jackpot ? 1 : 0, photo: raw.photo ? 1 : 0, age: raw.age || 0, active: new Set(raw.days).size, accepted: raw.accepted,
     perfAll: J4.reduce((s, j) => s + LV.filter(l => perf(j, l)).length, 0),
   };
@@ -161,21 +170,29 @@ export async function onRequest({ request, env, params, waitUntil }) {
 
   // ---------- Pencapaian: ambil data mentah (satu round trip), hitung metrik, buka yang baru ----------
   const achRaw = async id => {
-    const [best, [a1], [im], days, ddays, [en], own, [mi], [st], [rp], have, [ub]] = await sql.transaction([
+    const [best, [a1], [im], days, ddays, [en], own, [mi], [st], [rp], have, [ub], [rk]] = await sql.transaction([
       bestOf(id),
       sql`select coalesce(sum(correct), 0)::int c, (count(*) filter (where jilid between 1 and 4 and score >= ${PASS_PCT} and (created_at at time zone 'Asia/Jakarta')::time between time '03:45' and time '05:30'))::int subuh from attempts where user_id = ${id}`,
       sql`select exists(select 1 from (select score - lag(score) over (partition by jilid, level order by created_at) d from attempts where user_id = ${id} and jilid between 1 and 4) t where d >= 30) v`,
-      sql`select to_char(d, 'YYYY-MM-DD') d from (select (created_at at time zone 'Asia/Jakarta')::date d from attempts where user_id = ${id} and (jilid = 0 or score >= ${PASS_PCT}) union select day d from daily where user_id = ${id} and done) t order by d`,
+      sql`select to_char(d, 'YYYY-MM-DD') d from (select (created_at at time zone 'Asia/Jakarta')::date d from attempts where user_id = ${id} and (jilid = 0 or score >= ${PASS_PCT}) union select day d from daily where user_id = ${id} and done union select day d from daily_fast where user_id = ${id} and done) t order by d`,
       sql`select to_char(day, 'YYYY-MM-DD') d from daily where user_id = ${id} and done and score >= ${DAILY_PASS} order by day`,
       sql`select coalesce(max(n), 0)::int maxn, coalesce(bool_or(lives = 3 and n >= 31), false) clean from endless_runs where user_id = ${id}`,
       sql`select item from purchases where user_id = ${id}`,
-      sql`select exists(select 1 from daily where user_id = ${id} and prize >= 1000) jp, (select photo_v is not null from users where id = ${id}) photo, (select floor(extract(epoch from now() - created_at) / 86400)::int from users where id = ${id}) age`,
+      sql`select (exists(select 1 from daily where user_id = ${id} and prize >= 1000) or exists(select 1 from daily_fast where user_id = ${id} and prize >= 1000)) jp, exists(select 1 from daily_fast where user_id = ${id} and done and score >= 100) fp, (select photo_v is not null from users where id = ${id}) photo, (select floor(extract(epoch from now() - created_at) / 86400)::int from users where id = ${id}) age`,
       sql`select coalesce(max(best_run), 0)::int r from user_stats where user_id = ${id}`,
       sql`select count(*)::int n from question_reports where user_id = ${id} and accepted`,
       sql`select key, unlocked_at, gold, seen from user_achievements where user_id = ${id}`,
-      sql`select badges from users where id = ${id}`]);
+      sql`select badges from users where id = ${id}`,
+      // peringkat di Leaderboard (Semua): hanya dihitung bila XP cukup dan Juara Umum belum terbuka (jadi murid biasa tidak memicu pemindaian semua percobaan)
+      sql`with mine as (select coalesce(sum(xp), 0)::int xp from (select max(case when level = 'endless' then score::numeric else round((case level when 'easy' then 100 when 'medium' then 200 else 300 end) * correct::numeric / total) end)::int xp from attempts where user_id = ${id} group by jilid, level) x),
+          gate as (select xp from mine where xp >= ${RANK_MIN_XP}::int and not exists (select 1 from user_achievements where user_id = ${id} and key = 'rank1'))
+        select g.xp, r.pos, r.players from gate g, lateral (
+          select (count(*) filter (where t.total > g.xp) + 1)::int pos, count(*)::int players from (
+            select sum(b.xp) total from (
+              select a.user_id, max(case when a.level = 'endless' then a.score::numeric else round((case a.level when 'easy' then 100 when 'medium' then 200 else 300 end) * a.correct::numeric / a.total) end)::int xp
+              from attempts a join users u on u.id = a.user_id where u.role <> 'admin' or u.on_board group by a.user_id, a.jilid, a.level) b group by b.user_id) t) r`]);
     return { best, correct: a1.c, subuh: a1.subuh, improved: im.v, days: days.map(r => r.d), ddays: ddays.map(r => r.d), maxn: en.maxn, clean: en.clean,
-      items: own.map(r => r.item), jackpot: mi.jp, photo: mi.photo, age: mi.age, bestRun: st.r, accepted: rp.n, have, badges: ub ? ub.badges : [] };
+      items: own.map(r => r.item), jackpot: mi.jp, fastPerf: mi.fp, rank: rk || null, photo: mi.photo, age: mi.age, bestRun: st.r, accepted: rp.n, have, badges: ub ? ub.badges : [] };
   };
   // Buka semua pencapaian yang sudah memenuhi syarat (termasuk milik murid lama = backfill otomatis). Hadiah Gold dicatat di user_achievements.gold.
   const evalFull = async (id, seen = true) => {
@@ -476,9 +493,9 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const list = ACH.map(a => {
         const h = have.get(a.k), got = !!h;
         if (a.h && !got) return { k: a.k, g: a.g, n: '???', d: 'Pencapaian tersembunyi. Temukan sendiri!', i: '❔', t: a.t, gold: a.gold, h: 1, got: false, v: 0, need: 0 };
-        return { k: a.k, g: a.g, n: a.n, d: a.d, i: a.i, t: a.t, gold: a.gold, h: a.h, got, at: got ? h.unlocked_at : null, v: Math.min(ev.m[a.m] || 0, a.need), need: a.need };
+        return { k: a.k, g: a.g, n: a.n, d: a.d, i: a.i, t: a.t, gold: a.gold, h: a.h, np: a.np, got, at: got ? h.unlocked_at : null, v: Math.min(ev.m[a.m] || 0, a.need), need: a.need };
       });
-      return J({ list, groups: ACH_GROUPS, newly: ev.newly, pinned: ev.badges, skip: STREAK_SKIP_DOW,
+      return J({ list, groups: ACH_GROUPS, newly: ev.newly, pinned: ev.badges, skip: STREAK_SKIP_DOW, rank: ev.m.rankPos ? { pos: ev.m.rankPos, players: ev.m.players } : null, rmin: [RANK_MIN_XP, RANK_MIN_PLAYERS],
         earned: ev.have.reduce((s, r) => s + (r.gold || 0), 0),
         cur: { streak: ev.m.streakCur, best: ev.m.streak, dstreak: ev.m.dstreakCur, dbest: ev.m.dstreak } });
     }
@@ -557,12 +574,16 @@ export async function onRequest({ request, env, params, waitUntil }) {
 
     // ---------- Kuis harian (hari mengikuti WIB) ----------
     const dailyPity = () => sql`select count(*)::int n from daily where user_id = ${uid} and spun and day > coalesce((select max(day) from daily where user_id = ${uid} and prize >= ${RARE}), date '1970-01-01')`;
+    const fastPity = () => sql`select count(*)::int n from daily_fast where user_id = ${uid} and spun and day > coalesce((select max(day) from daily_fast where user_id = ${uid} and prize >= ${RARE}), date '1970-01-01')`;
     if (route === 'GET daily') {
-      const [[t], [p], [y]] = await sql.transaction([
+      const [[t], [p], [y], [ft], [fp], [fy]] = await sql.transaction([
         sql`select done, correct, score, spun, prize from daily where user_id = ${uid} and day = (now() at time zone 'Asia/Jakarta')::date`,
         sql`select count(*)::int n from daily where user_id = ${uid} and done and score >= ${DAILY_PASS} and not spun`,
-        dailyPity()]);
-      return J({ today: t || null, pending: p.n, pity: y.n, need: PITY, rare: RARE, prizes: PRIZES });
+        dailyPity(),
+        sql`select done, correct, score, spun, prize from daily_fast where user_id = ${uid} and day = (now() at time zone 'Asia/Jakarta')::date`,
+        sql`select count(*)::int n from daily_fast where user_id = ${uid} and done and score >= ${FAST_PASS} and not spun`,
+        fastPity()]);
+      return J({ today: t || null, pending: p.n, pity: y.n, need: PITY, rare: RARE, prizes: PRIZES, fast: { today: ft || null, pending: fp.n, pity: fy.n, pass: FAST_PASS, lim: FAST_LIM } });
     }
     if (route === 'POST daily/start') {
       const qs = await pickQs(0, DAILY_N);
@@ -586,15 +607,44 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (!row) return bad('Kuis harian ini sudah diselesaikan', 409);
       return J({ correct: row.correct, total, score: row.score, pass: row.score >= DAILY_PASS, ach: await evalAch(uid) });
     }
+    // ---------- Cepat Tepat: kuis harian kedua, 10 soal, batas waktu per soal 10 detik turun ke 5 detik ----------
+    // Satu kesempatan per hari (baris dibuat saat mulai). Klien mengirim waktu jawab tiap soal; server memeriksa batas per soal
+    // dan total waktu sejak mulai (anti-curang kasar, setara kuis lain: kunci jawaban memang ikut dikirim ke klien).
+    if (route === 'POST daily/fast/start') {
+      const qs = await pickQs(0, FAST_LIM.length);
+      if (qs.length < FAST_LIM.length) return bad('Soal belum cukup untuk Cepat Tepat (minimal ' + FAST_LIM.length + ' soal)');
+      const [r] = await sql`insert into daily_fast (user_id, day) values (${uid}, (now() at time zone 'Asia/Jakarta')::date) on conflict do nothing returning day::text as d`;
+      if (!r) return bad('Cepat Tepat hari ini sudah kamu ambil. Kembali lagi besok!', 409);
+      const token = await sign({ k: 'fast', uid, day: r.d, ids: qs.map(x => x.id), t0: Date.now(), exp: Date.now() + 36e5 }, S);
+      return J({ questions: qs, token, lim: FAST_LIM });
+    }
+    if (route === 'POST daily/fast/submit') {
+      const t = await verify(String(body.token || ''), S);
+      if (!t || t.k !== 'fast' || t.uid !== uid) return bad('Sesi Cepat Tepat tidak valid atau kedaluwarsa');
+      const total = t.ids.length, el = Date.now() - t.t0, budget = FAST_LIM.reduce((a, b) => a + b, 0) * 1000 + FAST_SLACK_MS;
+      if (el < total * 700) return bad('Terlalu cepat. Baca soal dengan teliti.', 429);
+      const an = body.answers && typeof body.answers === 'object' ? body.answers : {}, tm = body.times && typeof body.times === 'object' ? body.times : {};
+      // jawaban dihitung hanya bila waktunya sah: 0 <= waktu <= batas soal + toleransi; kirim terlambat (lewat total waktu) = semua dianggap salah
+      const ok = el <= budget ? t.ids.map((id, i) => [id, i]).filter(([id, i]) => /^[ABCD]$/.test(an[id]) && +tm[id] >= 0 && +tm[id] <= FAST_LIM[i] * 1000 + FAST_GRACE_MS) : [];
+      const ids = ok.map(x => x[0]), ls = ids.map(id => an[id]);
+      const [row] = await sql`with c as (select count(*)::int n from unnest(${ids}::int[], ${ls}::text[]) as a(id, l) join questions q on q.id = a.id and q.answer = a.l)
+        update daily_fast set done = true, correct = c.n, score = round(c.n * 100.0 / ${total}::int)::int from c
+        where user_id = ${uid} and day = ${t.day}::date and not done returning correct, score`;
+      if (!row) return bad('Cepat Tepat ini sudah diselesaikan', 409);
+      return J({ correct: row.correct, total, score: row.score, pass: row.score >= FAST_PASS, ach: await evalAch(uid) });
+    }
     if (route === 'POST daily/spin') {
+      const fast = body.mode === 'fast'; // spin dari Cepat Tepat memakai tabel dan hitungan jaminan sendiri
       const [[row], [y]] = await sql.transaction([
-        sql`select day::text d from daily where user_id = ${uid} and done and score >= ${DAILY_PASS} and not spun order by day desc limit 1`,
-        dailyPity()]);
+        fast ? sql`select day::text d from daily_fast where user_id = ${uid} and done and score >= ${FAST_PASS} and not spun order by day desc limit 1`
+          : sql`select day::text d from daily where user_id = ${uid} and done and score >= ${DAILY_PASS} and not spun order by day desc limit 1`,
+        fast ? fastPity() : dailyPity()]);
       if (!row) return bad('Kamu belum punya kesempatan spin', 409);
       const pool = y.n + 1 >= PITY ? PRIZES.filter(p => p[0] >= RARE) : PRIZES;
       let x = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 * pool.reduce((a, p) => a + p[1], 0), prize = pool[pool.length - 1][0];
       for (const [g, w] of pool) { if ((x -= w) < 0) { prize = g; break; } }
-      const [u] = await sql`update daily set spun = true, prize = ${prize} where user_id = ${uid} and day = ${row.d}::date and done and score >= ${DAILY_PASS} and not spun returning prize`;
+      const [u] = fast ? await sql`update daily_fast set spun = true, prize = ${prize} where user_id = ${uid} and day = ${row.d}::date and done and score >= ${FAST_PASS} and not spun returning prize`
+        : await sql`update daily set spun = true, prize = ${prize} where user_id = ${uid} and day = ${row.d}::date and done and score >= ${DAILY_PASS} and not spun returning prize`;
       if (!u) return bad('Spin sudah dipakai', 409);
       return J({ prize, rare: prize >= RARE, pity: prize >= RARE ? 0 : y.n + 1, ach: await evalAch(uid) });
     }
