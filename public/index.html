@@ -294,7 +294,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 .pz.win{animation:winp .6s ease-out infinite alternate;z-index:1}
 .ptr{position:absolute;left:50%;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;box-shadow:0 0 10px 2px var(--accent)}
 @keyframes winp{to{transform:scale(1.14);filter:brightness(1.25)}}
-/* ===== Toko ===== */
+/* ===== Efek (dulu Toko) ===== */
 .gold{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#FFE27A,#F2B705);color:#3a2e00;font-weight:800;padding:2px 14px;border-radius:999px}
 .shopbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .shopg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
@@ -328,6 +328,37 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
 @keyframes flip3{to{transform:rotateY(360deg)}}
 .lite .si .stage span{animation:none}
 @keyframes shim{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 22px -4px var(--tc)}}
+/* ===== Efek soal: teks soal di papan gelap (terbaca di tema terang dan gelap); gaya akhir menetap setelah animasi muncul ===== */
+.qfx{display:block;background:#0b1410;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:14px 18px;color:#E8F5EC;pointer-events:none}
+.qx{display:block;font-style:normal;font-weight:inherit}
+.qx.s,.lite .qx{animation:none!important}
+.qx.f_emas{background-image:linear-gradient(100deg,#e0a800 0 35%,#ffe27a 46%,#fff6c2 50%,#ffe27a 54%,#e0a800 65% 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:qfRise .8s ease-out,qfSheen 3.4s linear .8s infinite}
+.qx.f_embun{color:#d9f4ff;text-shadow:0 0 8px rgba(150,215,255,.55);animation:qfBlur .9s ease-out}
+.qx.f_neon{color:#d8fdff;text-shadow:0 0 3px #7ff,0 0 10px #0cf,0 0 22px #08f;animation:qfOn .9s steps(1),qfNeon 2.2s ease-in-out .9s infinite alternate}
+.qx.f_holo{background-image:repeating-linear-gradient(0deg,#8ffbff 0 2px,#27c2d6 2px 4px);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 4px rgba(0,229,255,.7));animation:qfScan .9s steps(9)}
+.qx.f_api{background-image:linear-gradient(0deg,#ff3d00,#ff9100 50%,#ffe082);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 -2px 6px rgba(255,100,0,.7));animation:qfBurn 1s ease-out,qfFlick 1.3s ease-in-out 1s infinite alternate}
+.qx.f_es{background-image:linear-gradient(100deg,#9fdcff 0 40%,#fff 50%,#9fdcff 60% 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 4px rgba(120,210,255,.8));animation:qfFreeze 1s ease-out,qfSheen 3.2s linear 1s infinite}
+.qx.f_petir{color:#eaf3ff;text-shadow:0 0 6px #4d9bff,0 0 16px #2f6bff;animation:qfStrike .9s,qfZap 3.4s 1.2s infinite}
+.qx.f_lava{color:#ffc46b;text-shadow:0 1px 0 #7a1200,0 0 10px #ff4a00;animation:qfRise .8s ease-out,qfLava 1.8s ease-in-out .8s infinite alternate}
+.qx.f_aurora{background-image:linear-gradient(90deg,#5dffb4,#6a8bff,#c06bff,#5dffb4);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:qfFade .8s,qfFlow 7s linear infinite}
+.qx.f_galaksi{background-image:radial-gradient(circle,#fff 0 1px,transparent 1.6px),linear-gradient(90deg,#b98cff,#6fe9ff,#ff8fe4,#b98cff);background-size:13px 13px,300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 5px rgba(170,110,255,.8));animation:qfFade .8s,qfFlow2 8s linear infinite}
+@keyframes qfRise{from{opacity:0;transform:translateY(8px)}}
+@keyframes qfFade{from{opacity:0}}
+@keyframes qfBlur{from{opacity:0;filter:blur(9px)}}
+@keyframes qfSheen{from{background-position:150% 0}to{background-position:-50% 0}}
+@keyframes qfOn{0%{opacity:0}12%{opacity:1}22%{opacity:.25}34%,100%{opacity:1}}
+@keyframes qfNeon{from{text-shadow:0 0 3px #7ff,0 0 8px #0cf,0 0 16px #08f}to{text-shadow:0 0 4px #aff,0 0 14px #0cf,0 0 30px #08f}}
+@keyframes qfScan{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(-20px)}}
+@keyframes qfBurn{from{clip-path:inset(100% -20px -20px -20px);transform:translateY(8px)}to{clip-path:inset(-20px)}}
+@keyframes qfFlick{from{filter:drop-shadow(0 -1px 4px rgba(255,90,0,.6))}to{filter:drop-shadow(0 -4px 9px rgba(255,160,0,.95))}}
+@keyframes qfFreeze{from{opacity:0;filter:blur(9px)}}
+@keyframes qfStrike{0%{opacity:0}6%{opacity:1;text-shadow:0 0 2px #fff,0 0 22px #fff,0 0 44px #5aa9ff}16%{opacity:.2}26%{opacity:1;text-shadow:0 0 2px #fff,0 0 18px #fff,0 0 36px #5aa9ff}45%,100%{opacity:1;text-shadow:0 0 6px #4d9bff,0 0 16px #2f6bff}}
+@keyframes qfZap{0%,92%,100%{text-shadow:0 0 6px #4d9bff,0 0 16px #2f6bff}94%{text-shadow:0 0 2px #fff,0 0 22px #9cc8ff,0 0 40px #5aa9ff}}
+@keyframes qfLava{from{text-shadow:0 1px 0 #7a1200,0 0 6px #ff4a00}to{text-shadow:0 1px 0 #7a1200,0 0 16px #ff6a00}}
+@keyframes qfFlow{to{background-position:-300% 0}}
+@keyframes qfFlow2{to{background-position:0 0,-300% 0}}
+.si .stage.ft{padding:0 10px;font-size:.95rem;font-weight:700;line-height:1.5}
+.si .stage.ft .qfx{width:100%;padding:10px 12px;border-radius:12px;text-align:center}
 /* lapor soal */
 .rptw{text-align:right;margin:-2px 0 6px}
 .rpt{font:inherit;font-size:.78rem;font-weight:600;color:var(--muted,#7a8a80);background:transparent;border:1px solid var(--line);border-radius:999px;padding:2px 10px;cursor:pointer}
@@ -370,7 +401,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
   <aside class="side">
     <div class="brand"><img src="/logo.png" alt="Al-Miftah – Mudah Belajar Membaca Kitab"></div>
     <button class="nav" data-v="home">Beranda</button>
-    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Toko</button><button class="nav" data-v="ach">Pencapaian</button>
+    <button class="nav" data-v="daily">Harian</button><button class="nav" data-v="board">Leaderboard</button><button class="nav" data-v="shop">Efek</button><button class="nav" data-v="ach">Pencapaian</button>
     <button class="nav" data-v="admin" id="navAdmin" hidden>Panel Admin</button>
     <div class="sp"></div>
     <button class="nav" data-v="profile" id="who"></button>
@@ -381,7 +412,7 @@ select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1
     <div class="scroll"><div class="wrap" id="view"></div><div class="credit">Powered by <b>Nabil Ghufron</b> 1447-1448 H</div></div>
   </main>
   <nav class="bnav" aria-label="Menu utama">
-    <button class="bn" data-v="home"><span>🏠</span>Beranda</button><button class="bn" data-v="daily"><span>🎯</span>Harian</button><button class="bn" data-v="board"><span>🏆</span>Peringkat</button><button class="bn" data-v="shop"><span>🛒</span>Toko</button><button class="bn" data-v="ach"><span>🏅</span>Capaian</button><button class="bn" data-v="profile"><span>👤</span>Profil</button>
+    <button class="bn" data-v="home"><span>🏠</span>Beranda</button><button class="bn" data-v="daily"><span>🎯</span>Harian</button><button class="bn" data-v="board"><span>🏆</span>Peringkat</button><button class="bn" data-v="shop"><span>✨</span>Efek</button><button class="bn" data-v="ach"><span>🏅</span>Capaian</button><button class="bn" data-v="profile"><span>👤</span>Profil</button>
   </nav>
 </div>
 <script>
@@ -475,6 +506,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 let tt;
 function typeIt(el, text) {
   clearInterval(tt);
+  if (qOn()) { qReveal(el, text, RM); return; } // efek soal terpasang: animasi muncul + percikan menggantikan mesin ketik
   if (RM) { el.textContent = text; return; }
   let i = 0; const dt = Math.max(8, Math.min(28, 1800 / text.length));
   el.classList.add('cur');
@@ -827,22 +859,95 @@ const NSHOP = [ // gaya nama: [kunci, nama, ikon(tak dipakai), tier, deskripsi];
 const NSTYLE = new Set(NSHOP.map(x => x[0]).filter(k => k !== 'n_none'));
 const nc = k => NSTYLE.has(k) ? 'nfx ' + k : ''; // kelas CSS gaya nama (kosong bila tidak valid)
 const nm = (name, k) => { const c = nc(k); return c ? `<span class="${c}">${esc(name)}</span>` : esc(name); };
+/* ---------- Efek soal (tab ketiga di menu Efek) ---------- */
+const FSHOP = [ // efek soal: [kunci, nama, ikon(tak dipakai), tier, deskripsi]; harga ada di server
+  ['f_none', 'Polos', '', 'Umum', 'Soal bawaan, diketik huruf demi huruf.'],
+  ['f_emas', 'Tinta Emas', '', 'Umum', 'Soal muncul pelan seperti tinta emas dengan kilau yang menyapu.'],
+  ['f_embun', 'Embun', '', 'Umum', 'Soal muncul dari kabur menjadi jernih, gelembung kecil naik.'],
+  ['f_neon', 'Neon', '', 'Langka', 'Soal menyala berkedip, lalu berdenyut lembut.'],
+  ['f_holo', 'Hologram', '', 'Langka', 'Soal dipindai dari atas dengan garis pemindai.'],
+  ['f_api', 'Api', '', 'Epik', 'Soal terbakar naik dari bawah, bara beterbangan.'],
+  ['f_es', 'Es', '', 'Epik', 'Soal membeku dari kabur, serpih es berjatuhan.'],
+  ['f_petir', 'Petir', '', 'Legendaris', 'Petir menyambar soal dua kali, lalu sesekali masih berkilat.'],
+  ['f_lava', 'Lava', '', 'Legendaris', 'Soal naik dari magma, bara berdenyut.'],
+  ['f_aurora', 'Aurora', '', 'Mitos', 'Warna aurora mengalir pelan di sepanjang soal.'],
+  ['f_galaksi', 'Galaksi', '', 'Mitos', 'Soal bertabur bintang berkelip dengan pendar galaksi.'],
+];
+const QSET = new Set(FSHOP.map(x => x[0]).filter(k => k !== 'f_none'));
+const QSAMPLE = "Apa i'rab «الطالبُ»?";
+const qOn = () => !!(me && QSET.has(me.fxq));
+/* Tampilkan teks soal dengan efek terpasang. st = true: gaya akhir saja (Cepat Tepat, reduced-motion). Teks dipasang lewat textContent (aman). */
+function qReveal(el, text, st) {
+  el.classList.remove('cur'); el.classList.add('qfx');
+  const e = document.createElement('em'); e.className = 'qx ' + me.fxq + (st ? ' s' : ''); e.dir = 'auto'; e.textContent = text;
+  el.textContent = ''; el.appendChild(e);
+  if (!st && !RM && !LITE()) setTimeout(() => { try { if (QP[me.fxq] && el.isConnected) QP[me.fxq](el.getBoundingClientRect()); } catch (x) {} }, 120);
+}
+/* Percikan efek soal: versi ringan dari mesin 3D. Jumlah partikel mengikuti kualitas (N); mati di kualitas Rendah dan reduced-motion. */
+const QP = (() => {
+  const bx = r => [r.left + r.width / 2, r.top + r.height / 2, r.width, r.height];
+  const bolt = (x0, y0, z0, x1, y1, z1, n, jit) => Array.from({ length: n + 1 }, (_, i) => { const t = i / n, e = i && i < n ? 1 : 0; return [x0 + (x1 - x0) * t + e * R(-jit, jit), y0 + (y1 - y0) * t + e * R(-jit * .4, jit * .4), z0 + (z1 - z0) * t]; });
+  const RAMP = [[255, 250, 200], [255, 190, 50], [255, 90, 10], [150, 20, 0]];
+  return {
+    f_emas: r => { const [ox, oy, w, h] = bx(r); E3.add({ ox, oy, sz: Math.min(w, 260) * .6, max: .6, c: [255, 210, 90], ad: 1.5, a: .5 });
+      for (let i = 0; i < N(12); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy + R(-h / 2, h / 2), k: 'star', halo: 1, sz: R(5, 11), vy: R(-50, -15), vx: R(-20, 20), max: R(.8, 1.3), c: pick([[255, 214, 90], [255, 240, 160]]), wx: R(-5, 5), wz: R(-3, 3), ad: .8, ai: .1 }); },
+    f_embun: r => { const [ox, oy, w, h] = bx(r);
+      for (let i = 0; i < N(10); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy + h / 2 - 4, z: R(-60, 120), k: 'sphere', glass: 1, add: 0, sz: R(6, 15), vy: R(-170, -70), vx: R(-20, 20), dr: .5, max: R(.9, 1.5), c: [150, 215, 255], ad: .6, ai: .08 }); },
+    f_neon: r => { const [ox, oy, w] = bx(r); E3.add({ ox, oy, sz: Math.min(w, 300) * .55, max: .7, c: [60, 220, 255], ad: 1.4, a: .45 });
+      E3.add({ ox, oy, k: 'ring', r0: 8, r1: Math.min(w * .45, 200), tilt: .2, lw: 5, c: [90, 230, 255], max: .7 });
+      sparks(ox, oy, 14, [90, 230, 255], 80, 260, { max: R(.4, .8) }); },
+    f_holo: r => { const [ox, oy, w, h] = bx(r), n = N(12);
+      for (let i = 0; i < n; i++) setTimeout(() => E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy - h / 2 + h * i / n, k: 'spark', sz: 2, c: [120, 250, 255], vx: R(-30, 30), vy: R(10, 50), max: R(.3, .6) }), i * 75); },
+    f_api: r => { const [ox, oy, w, h] = bx(r); E3.add({ ox, oy: oy + h / 2, sz: Math.min(w, 320) * .6, max: .9, c: [255, 110, 20], ad: 1.3, a: .5 });
+      let n = 0; const iv = setInterval(() => {
+        for (let i = 0; i < N(5); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy + h / 2 - 4, z: R(-60, 100), ramp: RAMP, sz: R(14, 28), gr: .5, vy: R(-260, -120), vx: R(-30, 30), dr: .6, max: R(.45, .8), ad: 1.1, tick: p => { p.vx += Math.sin(p.t * 9 + p.sz) * 18; } });
+        for (let i = 0; i < N(2); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy + h / 2, k: 'spark', sz: 2, c: [255, 170, 60], vy: R(-360, -180), vx: R(-70, 70), g: -40, dr: .5, max: R(.7, 1.2) });
+        if (++n > 8) clearInterval(iv);
+      }, 60); },
+    f_es: r => { const [ox, oy, w, h] = bx(r); E3.add({ ox, oy, sz: Math.min(w, 300) * .6, max: .7, c: [120, 210, 255], ad: 1.4, a: .45 });
+      for (let i = 0; i < N(16); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy - h / 2 + R(0, 10), k: 'spark', sz: R(1.6, 3), c: pick([[130, 215, 255], [200, 240, 255]]), vy: R(60, 180), vx: R(-25, 25), g: 120, dr: .3, max: R(.8, 1.4) });
+      for (let i = 0; i < N(4); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy + R(-h / 2, h / 2), k: 'star', halo: 1, sz: R(5, 10), c: [200, 240, 255], max: R(.7, 1.1), wx: R(-4, 4), wz: R(-3, 3), ad: .9, ai: .1 }); },
+    f_petir: r => { const [ox, oy, w, h] = bx(r), B = [80, 140, 255];
+      const strike = (d, pw) => setTimeout(() => {
+        E3.add({ ox, oy, k: 'bolt', pts: bolt(R(-60, 60), -(oy + 60), 400, R(-w * .2, w * .2), -h / 2, -10, 12, 40), c: B, max: .5, ad: 0 });
+        flash3([150, 180, 255], .2 * pw, .25);
+        E3.add({ ox, oy, sz: Math.min(w, 320) * .7 * pw, max: .5, c: [140, 180, 255], ad: 1.4, a: .5 });
+        sparks(ox, oy - h / 2, 14, [[255, 240, 150], [200, 225, 255]], 120, 360, { g: 400, max: R(.3, .7) });
+      }, d);
+      strike(0, 1); strike(190, .75); },
+    f_lava: r => { const [ox, oy, w, h] = bx(r); E3.add({ ox, oy: oy + h / 2, sz: Math.min(w, 320) * .6, max: .8, c: [255, 90, 20], ad: 1.3, a: .5 });
+      for (let i = 0; i < N(12); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy + h / 2 - 2, k: 'sphere', halo: 1, sz: R(3, 7), c: pick([[255, 140, 40], [255, 90, 20]]), vy: R(-150, -60), vx: R(-20, 20), dr: .4, max: R(.9, 1.6), ad: .9, ai: .05, g: -20 }); },
+    f_aurora: r => { const [ox, oy, w, h] = bx(r), CL = [[93, 255, 180], [106, 139, 255], [192, 107, 255]];
+      for (let i = 0; i < N(9); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy + R(-h / 2, h / 2), sz: R(40, 90), c: pick(CL), vx: R(-30, 30), vy: R(-20, 10), max: R(1, 1.6), ad: 1.2, ai: .25, a: .35 }); },
+    f_galaksi: r => { const [ox, oy, w, h] = bx(r), CL = [[190, 110, 255], [90, 220, 255], [255, 130, 220], [255, 255, 255]];
+      E3.add({ ox, oy, sz: Math.min(w, 320) * .6, max: .8, c: [150, 70, 230], ad: 1.3, a: .45 });
+      for (let i = 0; i < N(12); i++) E3.add({ ox: ox + R(-w / 2, w / 2), oy: oy + R(-h / 2, h / 2), k: 'star', halo: 1, sz: R(4, 10), c: pick(CL), max: R(.9, 1.5), wx: R(-5, 5), wz: R(-3, 3), ad: .9, ai: .15 }); },
+  };
+})();
 const TIER = { Umum: '#8A97A6', Langka: '#2BA3E6', Epik: '#A94BC0', Legendaris: '#E8960F', Mitos: '#EF3E7B' };
 let shopTab = 'fx';
 async function vShop() {
   V.innerHTML = '<p class="muted">Memuat…</p>';
   let st; try { st = await api('shop'); } catch (e) { V.textContent = e.message; return; }
-  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; };
-  const play = k => { const s = $('#sg-' + k); if (s) (FX[k] || FX.confetti)(s.getBoundingClientRect(), s); };
+  const sync = () => { me.spent = st.spent; me.bonus = st.bonus; me.fxa = st.equipped; me.fxn = st.equippedName; me.fxq = st.equippedFont; };
+  const play = k => {
+    const s = $('#sg-' + k); if (!s) return;
+    if (k.startsWith('f_')) { // efek soal: putar ulang animasi muncul + percikan
+      const e = s.querySelector('.qx'); if (e) { e.classList.remove(k); void e.offsetWidth; e.classList.add(k); }
+      if (!RM && !LITE() && QP[k]) setTimeout(() => { try { QP[k](s.getBoundingClientRect()); } catch (x) {} }, 120);
+      return;
+    }
+    (FX[k] || FX.confetti)(s.getBoundingClientRect(), s);
+  };
   const draw = () => {
-    sync(); const g = st.gold, nameTab = shopTab === 'nm', list = nameTab ? NSHOP : SHOP;
-    V.innerHTML = `<div class="shopbar"><h1>Toko</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
-      <div class="tabs"><button data-st="fx" class="${nameTab ? '' : 'on'}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button></div>
-      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : 'Gold didapat dari tiap level, sama seperti XP: setiap rekor baru menambah XP dan Gold sebanyak yang sama. Belanjakan untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rankmu (${RANKS[rkOf(totalXp())][1]}): +${me.pays[rkOf(totalXp())]} Gold, otomatis tiap hari. ` : ''}Membeli tidak mengurangi XP atau rankmu.${st.admin ? ' Sebagai admin, semua item terbuka untukmu.' : ''}</p>
+    sync(); const g = st.gold, nameTab = shopTab === 'nm', fontTab = shopTab === 'ft', list = nameTab ? NSHOP : fontTab ? FSHOP : SHOP;
+    V.innerHTML = `<div class="shopbar"><h1>Efek</h1><span class="gold" style="font-size:1.15rem">${GL} ${g}</span></div>
+      <div class="tabs"><button data-st="fx" class="${nameTab || fontTab ? '' : 'on'}">🎆 Efek Jawaban</button><button data-st="nm" class="${nameTab ? 'on' : ''}">✒️ Gaya Nama</button><button data-st="ft" class="${fontTab ? 'on' : ''}">⚡ Efek Soal</button></div>
+      <p class="muted shopnote">${nameTab ? 'Gaya nama mengubah tampilan namamu di leaderboard, profil, dan menu. ' : fontTab ? 'Efek soal mengubah cara teks soal muncul saat kuis, dari tinta emas sampai petir dan api. Di Cepat Tepat soal langsung tampil dengan gaya akhirnya saja, supaya waktumu tidak terpotong. ' : 'Gold didapat dari tiap level, sama seperti XP: setiap rekor baru menambah XP dan Gold sebanyak yang sama. Belanjakan untuk efek yang muncul saat jawabanmu benar. '}${!st.admin && me.pays ? `Bonus harian rankmu (${RANKS[rkOf(totalXp())][1]}): +${me.pays[rkOf(totalXp())]} Gold, otomatis tiap hari. ` : ''}Membeli tidak mengurangi XP atau rankmu.${st.admin ? ' Sebagai admin, semua item terbuka untukmu.' : ''}</p>
       <div class="shopg">${list.map(([k, nm_, ic, tr, ds]) => {
-        const free = k === 'confetti' || k === 'n_none', own = free || st.owned.includes(k), pr = st.prices[k] || 0;
-        const eq = nameTab ? (st.equippedName || 'n_none') === k : (st.equipped || 'confetti') === k;
-        const stage = nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
+        const free = k === 'confetti' || k === 'n_none' || k === 'f_none', own = free || st.owned.includes(k), pr = st.prices[k] || 0;
+        const eq = nameTab ? (st.equippedName || 'n_none') === k : fontTab ? (st.equippedFont || 'f_none') === k : (st.equipped || 'confetti') === k;
+        const stage = nameTab ? `<div class="stage nm"><b class="${nc(k)}">${esc(me.username)}</b></div>` : fontTab ? `<div class="stage ft" id="sg-${k}"><div class="${k === 'f_none' ? '' : 'qfx'}"><em class="qx ${k}" dir="auto">${QSAMPLE}</em></div></div>` : `<div class="stage" id="sg-${k}"><span>${ic}</span></div>`;
         return `<div class="si${eq ? ' eq' : ''}${tr === 'Legendaris' || tr === 'Mitos' ? ' hi' : ''}" style="--tc:${TIER[tr]}"><span class="tg">${tr}</span>${stage}<h3>${nm_}</h3><p>${ds}</p>
           <div class="acts">${nameTab ? '' : `<button class="btn ghost" data-try="${k}">Coba</button>`}${own
             ? `<button class="btn" data-eq="${k}"${eq ? ' disabled' : ''}>${eq ? 'Terpasang ✓' : 'Pasang'}</button>`
@@ -851,11 +956,11 @@ async function vShop() {
     V.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { shopTab = b.dataset.st; draw(); });
     V.querySelectorAll('[data-try]').forEach(b => b.onclick = () => play(b.dataset.try));
     V.querySelectorAll('[data-eq]').forEach(b => b.onclick = async () => {
-      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); toast(b.dataset.eq.startsWith('n_') ? 'Gaya nama terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
+      try { st = await api('shop/equip', { item: b.dataset.eq }); draw(); renderChip(); toast(b.dataset.eq.startsWith('n_') ? 'Gaya nama terpasang' : b.dataset.eq.startsWith('f_') ? 'Efek soal terpasang' : 'Efek terpasang', '✨'); } catch (e) { toast(e.message, '⚠️'); }
     });
     V.querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
-      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k);
-      if (!confirm(`Beli ${k.startsWith('n_') ? 'gaya nama' : 'efek'} "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
+      const k = b.dataset.buy, it = SHOP.find(x => x[0] === k) || NSHOP.find(x => x[0] === k) || FSHOP.find(x => x[0] === k);
+      if (!confirm(`Beli ${k.startsWith('n_') ? 'gaya nama' : k.startsWith('f_') ? 'efek soal' : 'efek'} "${it[1]}" seharga ${st.prices[k]} Gold?`)) return;
       try { st = await api('shop/buy', { item: k }); draw(); toast('Berhasil dibeli: ' + it[1], '🛍️'); noteAch(st.ach, true); if (!k.startsWith('n_')) play(k); } catch (e) { toast(e.message, '⚠️'); }
     });
   };
@@ -902,7 +1007,7 @@ async function vDaily() {
     const rc = w.getBoundingClientRect();
     if (r.prize >= 1000) { FX.fireworks(rc); setTimeout(() => FX.galaxy(rc, w), 300); flash('rgba(245,197,24,.3)'); }
     else if (r.prize >= 500) FX.fireworks(rc); else if (r.prize >= d.rare) FX.stars(rc); else burst(...cen(rc), 18);
-    $('.spin .row').innerHTML = `<button class="btn ghost" id="shp">Ke Toko</button><button class="btn" id="spn">${sp.n > 1 || sp.more ? 'Lanjut' : 'Selesai'}</button>`;
+    $('.spin .row').innerHTML = `<button class="btn ghost" id="shp">Ke Efek</button><button class="btn" id="spn">${sp.n > 1 || sp.more ? 'Lanjut' : 'Selesai'}</button>`;
     $('#shp').onclick = () => go('shop'); $('#spn').onclick = () => vDaily();
   };
   $('#spin').onclick = async () => {
@@ -929,11 +1034,11 @@ function vDailyQuiz(d) {
       `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
     const h = $('#qt'), all = V.querySelectorAll('.opt'); bindRpts();
     typeIt(h, q.q);
-    h.onclick = () => { clearInterval(tt); h.textContent = q.q; h.classList.remove('cur'); };
+    h.onclick = () => { clearInterval(tt); if (!qOn()) h.textContent = q.q; h.classList.remove('cur'); };
     all.forEach(b => b.onclick = () => {
       all.forEach(x => x.disabled = true);
       const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
-      clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
+      clearInterval(tt); if (!qOn()) h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
       if (ok) ansFx(b); else { b.classList.add('no'); wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
       $('#fb').innerHTML = ok ? `<div class="fb ok">${pick(['Benar!', 'Masya Allah, tepat!', 'Barakallahu fiik!'])}</div>` : `<div class="fb no">Belum tepat. Jawaban yang benar: ${q.answer}</div>`;
@@ -964,7 +1069,7 @@ function vFastQuiz(d) {
       ['a', 'b', 'c', 'd'].map((k, n) => `<button class="opt" style="--i:${n}" data-k="${k.toUpperCase()}" dir="auto"><b>${k.toUpperCase()}</b><span>${esc(q[k])}</span></button>`).join('') +
       `</div><div id="fb"></div></div>`;
     const h = $('#qt'), all = V.querySelectorAll('.opt'), tc = $('#tc'), tm = $('#tm'), bar = $('#tmi');
-    h.textContent = q.q; // soal langsung tampil penuh: waktu sudah berjalan
+    qOn() ? qReveal(h, q.q, true) : h.textContent = q.q; // soal langsung tampil penuh: waktu sudah berjalan
     const next = ms => setTimeout(() => { if (i < qs.length - 1) { i++; draw(); } else finish(); }, RM ? Math.min(ms, 600) : ms);
     const stop = () => { done = true; cancelAnimationFrame(raf); all.forEach(x => x.disabled = true); };
     const key = [...all].find(x => x.dataset.k === q.answer);
@@ -1086,11 +1191,11 @@ function vQuiz(d, j, l) {
       `</div><div id="fb"></div><div class="row"><span></span><button class="btn" id="nx" hidden>${i < qs.length - 1 ? 'Berikutnya →' : 'Lihat hasil'}</button></div></div>`;
     const h = $('#qt'), all = V.querySelectorAll('.opt'); bindRpts();
     typeIt(h, q.q);
-    h.onclick = () => { clearInterval(tt); h.textContent = q.q; h.classList.remove('cur'); };
+    h.onclick = () => { clearInterval(tt); if (!qOn()) h.textContent = q.q; h.classList.remove('cur'); };
     all.forEach(b => b.onclick = () => { // jawaban diperiksa di perangkat: tanpa menunggu server
       all.forEach(x => x.disabled = true);
       const k = b.dataset.k, ok = k === q.answer; ans[q.id] = k;
-      clearInterval(tt); h.textContent = q.q; h.classList.remove('cur');
+      clearInterval(tt); if (!qOn()) h.textContent = q.q; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
       if (ok) { streak++; ansFx(b); }
       else { b.classList.add('no'); streak = 0; wrong.push({ id: q.id, q: q.q, a: q[q.answer.toLowerCase()], k: q.answer }); }
@@ -1145,13 +1250,13 @@ function vEndless(d) {
       `</div><div id="fb"></div><div class="row"><button class="btn ghost" id="st">Berhenti</button><button class="btn" id="nx" hidden>Lanjut →</button></div></div>`;
     const h = $('#qt'), all = V.querySelectorAll('.opt'), text = q.q; bindRpts();
     typeIt(h, text);
-    h.onclick = () => { clearInterval(tt); h.textContent = text; h.classList.remove('cur'); };
+    h.onclick = () => { clearInterval(tt); if (!qOn()) h.textContent = text; h.classList.remove('cur'); };
     $('#st').onclick = () => { sync(true); fin({ score, correct, answered: ch.length }); };
     all.forEach(b => b.onclick = () => {
       all.forEach(x => x.disabled = true); $('#st').disabled = true;
       const k = b.dataset.k, ok = k === q.answer, pts = ok ? 10 * Math.ceil(n / 10) : 0;
       ch.push(k); if (ok) { score += pts; correct++; } else lives--;
-      clearInterval(tt); h.textContent = text; h.classList.remove('cur');
+      clearInterval(tt); if (!qOn()) h.textContent = text; h.classList.remove('cur');
       [...all].find(x => x.dataset.k === q.answer).classList.add('ok');
       if (ok) { ansFx(b); $('#sc').classList.add('pop'); }
       else { b.classList.add('no'); $('#hp').classList.add('shk'); }
@@ -1196,7 +1301,7 @@ const myAv = () => me.usePhoto && me.photo ? pkey(me.username, me.photo) : me.av
 /* Lencana terpasang: bd = [[ikon, nama, tingkat], ...] dari server */
 const bdg = bd => bd && bd.length ? `<span class="bdg">${bd.map(b => `<i title="${esc(b[1])}" style="--tc:${TIER[b[2]]}">${b[0]}</i>`).join('')}</span>` : '';
 const bdgChips = bd => bd && bd.length ? `<div class="bdgs">${bd.map(b => `<span class="bc" style="--tc:${TIER[b[2]]}">${b[0]} ${esc(b[1])}</span>`).join('')}</div>` : '';
-/* Toast pencapaian baru. owned = true bila Gold-nya sudah termasuk di me.bonus (dari /me atau Toko), supaya tidak dihitung dua kali. */
+/* Toast pencapaian baru. owned = true bila Gold-nya sudah termasuk di me.bonus (dari /me atau menu Efek), supaya tidak dihitung dua kali. */
 function noteAch(list, owned) {
   if (!list || !list.length) return;
   if (!owned) me.bonus = (me.bonus || 0) + list.reduce((s, a) => s + (a.g || 0), 0);
@@ -1252,9 +1357,9 @@ const GUIDE = {
     <li>Di <b>Profil</b> kamu bisa mengganti username, foto (emoji atau foto pribadi dari galeri yang otomatis dikompres), dan password (pilihan yang tersedia) serta melihat pencapaian. Lupa password? Minta admin mengatur ulang.</li>
     <li><b>Efek foto profil:</b> tiap pencapaian (khatam jilid dan tahap Tathbiq) menambah efek pada fotomu di sidebar, profil, dan leaderboard: dari cincin sederhana, cincin berputar bercahaya, titik cahaya mengorbit, sampai mahkota emas di tahap Takhossus. Di <b>Profil</b> kamu bebas memilih efek yang sudah terbuka (atau Otomatis, atau tanpa efek).</li>
     <li><b>Pencapaian rank:</b> Bronze, Silver, Gold, Platinum, Diamond, dan Legend diraih dari total XP. Tiga teratas di leaderboard mendapat bingkai khusus: api 🔥 (juara 1), petir ⚡ (juara 2), dan percikan aura ✨ (juara 3).</li>
-    <li><b>Gold dan Toko:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Toko</b> untuk efek yang muncul saat jawabanmu benar, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
+    <li><b>Gold dan Efek:</b> tiap rekor baru memberi Gold sebanyak XP-nya.@@GOLDINFO@@ Belanjakan di menu <b>Efek</b> untuk efek yang muncul saat jawabanmu benar, gaya namamu, dan efek teks soal, dari yang sederhana sampai petir dan galaksi. Efek bisa dicoba dulu, dan membeli tidak mengurangi XP atau rankmu.</li>
     <li><b>Kuis Harian:</b> 10 soal acak dari semua jilid, sekali sehari dan tidak bisa diulang. Nilai minimal 80 memberi satu kali spin hadiah Gold, sampai 1000! Jangan tutup halaman sebelum selesai, karena kesempatan hari itu langsung terpakai.</li>
-    <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai koleksi Toko. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
+    <li><b>Pencapaian dan lencana:</b> menu <b>Pencapaian</b> berisi puluhan target, dari streak harian, nilai sempurna, jawaban beruntun, sampai koleksi Efek. Tiap pencapaian memberi Gold sekali, ada juga yang tersembunyi. Di <b>Profil</b> kamu bisa memasang sampai 3 lencana yang tampil di leaderboard dan profilmu. Hari Jumat tidak memutus streak.</li></ul>`,
   tat: `<ul class="gl"><li><b>Syarat:</b> Mode Tathbiq terbuka setelah semua quest Jilid 1–4 selesai (minimal 60% benar di tiap level).</li>
     <li><b>Mode Tathbiq:</b> soal acak dari semua jilid, tanpa pengulangan, dengan <b>3 nyawa</b>. Salah 3 kali, permainan selesai.</li>
     <li>Tiap 10 soal naik tahap: Tathbiq 1 (soal 1–10), Tathbiq 2 (11–20), … Tathbiq 6 (51–60), lalu <b>Takhossus</b> (soal 61 dan seterusnya).</li>
@@ -1274,7 +1379,7 @@ function openGuide() {
 function openWelcome(thenGuide) {
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="box"><h2>Selamat datang, ${esc(me.username)}! 🎉</h2><p class="muted">Akunmu sudah jadi. Ada beberapa hal penting yang perlu kamu ketahui:</p>
-    <ul class="gl">${me.starter ? `<li><b>Gold awal ${me.starter} ${GL}!</b> Murid baru mendapat Gold untuk dibelanjakan di menu <b>Toko</b>. Setiap hari kamu juga mendapat Gold bonus sesuai rank (${payText()}), otomatis saat kamu membuka aplikasi.</li>` : ''}<li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
+    <ul class="gl">${me.starter ? `<li><b>Gold awal ${me.starter} ${GL}!</b> Murid baru mendapat Gold untuk dibelanjakan di menu <b>Efek</b>. Setiap hari kamu juga mendapat Gold bonus sesuai rank (${payText()}), otomatis saat kamu membuka aplikasi.</li>` : ''}<li><b>Akunmu tersimpan.</b> Setelah mendaftar, kamu bisa masuk lagi kapan saja dengan akun yang kamu daftarkan. Semua pencapaianmu (XP, rank, jilid yang selesai, dan efek foto) tersimpan di server, jadi tidak hilang walau kamu menutup halaman atau pindah perangkat.</li>
     <li><b>Jaga passwordmu.</b> Jangan beritahukan ke siapa pun, termasuk teman. Admin tidak bisa melihat passwordmu; kalau lupa, admin hanya bisa mengaturnya ulang.</li>
     <li><b>Password bisa diganti</b> kapan saja lewat menu <b>Profil</b>.</li>
     <li><b>Username bisa diubah nanti.</b> Buka menu <b>Profil</b>, lalu ubah username (3–20 karakter: huruf, angka, atau _). Username tampil di leaderboard, jadi pilih nama yang sopan.</li>
@@ -1346,7 +1451,7 @@ async function vProfile() {
     <div class="card"><h2>Efek foto profil</h2><p class="muted">Pilih efek bingkai yang ingin dipakai, lalu tekan Simpan. ${ADM() ? 'Sebagai admin, semua efek terbuka.' : 'Efek terbuka seiring pencapaianmu. Pilih Otomatis agar selalu memakai efek tertinggi.'}</p><div class="fxg" id="fxg">${fxGrid(dk(), pk)}</div><div class="row" style="margin-top:12px"><span></span><button class="btn" id="fxs">Simpan tampilan</button></div></div></section>
     <section class="pnl" data-p="acc"${ptab === 'acc' ? '' : ' hidden'}><div class="card"><h2>Nama pengguna</h2><input id="pu" maxlength="20" value="${esc(me.username)}" autocomplete="off">${ADM() ? `<label class="chk"><input type="checkbox" id="pbd"${me.board === false ? '' : ' checked'}> Tampilkan akunku di leaderboard</label>` : ''}<div class="err" id="err"></div><button class="btn" id="ps">Simpan</button></div>
     <div class="card"><h2>Ganti password</h2><input id="pwo" type="password" placeholder="Password lama" autocomplete="current-password"><input id="pwn" type="password" placeholder="Password baru (minimal 6 karakter)" autocomplete="new-password"><input id="pwn2" type="password" placeholder="Ulangi password baru" autocomplete="new-password"><div class="err" id="perr"></div><button class="btn" id="pws">Ganti password</button></div></section>
-    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di Toko atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
+    <section class="pnl" data-p="set"${ptab === 'set' ? '' : ' hidden'}><div class="card"><h2>Kualitas efek jawaban</h2><p class="muted">Kalau efek di menu Efek atau saat menjawab terasa patah-patah, pilih kualitas lebih rendah. Otomatis menyesuaikan sendiri dengan kemampuan perangkatmu.</p>
     <div class="tabs" id="fxq">${[['auto', 'Otomatis'], ['high', 'Tinggi'], ['mid', 'Sedang'], ['low', 'Rendah']].map(([k, t]) => `<button data-fq="${k}" class="${FXQ.mode === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <p class="muted" id="fxqn"></p><button class="btn ghost" id="fxt">Coba efek</button></div>
     <div class="card"><h2>Bantuan dan akun</h2><div class="slist"><button class="srow" id="pGuide"><span>📖</span><b>Panduan</b><small>Cara memakai Al-Miftah</small></button><button class="srow" id="pTheme"><span>🌓</span><b>Ganti tema</b><small>Terang atau gelap</small></button>${ADM() ? `<button class="srow adminlnk" data-v="admin"><span>🛠️</span><b>Panel Admin</b><small>${me.reports ? me.reports + ' laporan soal menunggu' : 'Kelola soal dan murid'}</small></button>` : ''}<button class="srow out" id="pOut"><span>🚪</span><b>Keluar</b><small>Akhiri sesi di perangkat ini</small></button></div></div></section>
@@ -1506,6 +1611,8 @@ async function openPlayer(un, rk) {
     <div class="itg">${SHOP.map(([k, nm, ic, tr]) => { const has = k === 'confetti' || own.has(k), eq = (d.equipped || 'confetti') === k; return `<button class="itm${has ? ' own' : ''}${has && eq ? ' eq' : ''}" style="--tc:${TIER[tr]}" data-k="${k}"${has ? '' : ' disabled'}><span>${has ? ic : '🔒'}</span><b>${nm}</b><small>${tr}</small></button>`; }).join('')}</div>
     <h3>Gaya nama (${NSHOP.filter(x => x[0] !== 'n_none' && own.has(x[0])).length}/${NSHOP.length - 1})</h3>
     <div class="itg">${NSHOP.filter(x => x[0] !== 'n_none').map(([k, nm_, , tr]) => { const has = own.has(k), eq = d.nm === k; return `<div class="itm${has ? ' own' : ''}${has && eq ? ' eq' : ''}" style="--tc:${TIER[tr]}"><span>${has ? `<b class="${nc(k)}" style="font-size:1.05rem">Aa</b>` : '🔒'}</span><b>${nm_}</b><small>${tr}</small></div>`; }).join('')}</div>
+    <h3>Efek soal (${FSHOP.filter(x => x[0] !== 'f_none' && own.has(x[0])).length}/${FSHOP.length - 1})</h3>
+    <div class="itg">${FSHOP.filter(x => x[0] !== 'f_none').map(([k, nm_, , tr]) => { const has = own.has(k), eq = d.fq === k; return `<div class="itm${has ? ' own' : ''}${has && eq ? ' eq' : ''}" style="--tc:${TIER[tr]}"><span>${has ? '⚡' : '🔒'}</span><b>${nm_}</b><small>${tr}</small></div>`; }).join('')}</div>
     <div class="row" style="margin-top:16px"><span></span><button class="btn" id="plx">Tutup</button></div></div>`;
   document.body.appendChild(m);
   const close = () => { m.remove(); removeEventListener('keydown', esc2); }, esc2 = e => { if (e.key === 'Escape') close(); };
